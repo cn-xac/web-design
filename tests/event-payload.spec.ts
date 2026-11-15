@@ -5,10 +5,9 @@
  */
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import ElementPlus from "element-plus";
 import { defineComponent, h, nextTick } from "vue";
 import { SchemaRenderer } from "@x-ac/web-design-vue";
-import { elementPlusAdapter } from "@x-ac/web-design-vue-element-plus";
+import { testAdapter } from "@/fixtures/test-adapter";
 import {
   camelizeEventName,
   createEventPayload,
@@ -54,7 +53,7 @@ const Emitter = defineComponent({
 function makeAdapter(overrides: Partial<UiAdapter<unknown>> = {}): UiAdapter<unknown> {
   return registerMaterials(
     {
-      ...elementPlusAdapter,
+      ...testAdapter,
       actions: { notify: vi.fn(), confirm: async () => true },
       ...overrides,
     } as UiAdapter<unknown>,
@@ -168,7 +167,6 @@ describe("Vue 渲染器事件回调", () => {
     const onEvent = vi.fn();
     const wrapper = mount(SchemaRenderer, {
       props: { page: makePage([]), adapter: makeAdapter(), onEvent },
-      global: { plugins: [ElementPlus] },
     });
     await fire(wrapper);
 
@@ -192,7 +190,6 @@ describe("Vue 渲染器事件回调", () => {
     const notify = vi.fn();
     const wrapper = mount(SchemaRenderer, {
       props: { page: makePage([]), adapter: makeAdapter(), onEvent, onNodeEvent: notify },
-      global: { plugins: [ElementPlus] },
     });
     await fire(wrapper);
     expect(notify).toHaveBeenCalledTimes(1);
@@ -209,7 +206,6 @@ describe("Vue 渲染器事件回调", () => {
         adapter,
         onEvent: (p: UiEventPayload) => p.preventDefault(),
       },
-      global: { plugins: [ElementPlus] },
     });
     await fire(wrapper);
     expect(notify).not.toHaveBeenCalled();
@@ -219,7 +215,6 @@ describe("Vue 渲染器事件回调", () => {
     const onEvent = vi.fn(() => false as const);
     const wrapper = mount(SchemaRenderer, {
       props: { page: makePage([]), adapter: makeAdapter(), onEvent, mode: "edit" },
-      global: { plugins: [ElementPlus] },
     });
     await fire(wrapper);
     expect(onEvent).not.toHaveBeenCalled();
@@ -235,7 +230,6 @@ describe("Vue 渲染器事件回调", () => {
         ]),
         adapter,
       },
-      global: { plugins: [ElementPlus] },
     });
     await fire(wrapper);
     const scope = (wrapper.vm as unknown as { scope: Record<string, unknown> }).scope;
@@ -250,7 +244,6 @@ describe("Vue 渲染器事件回调", () => {
     const adapter = makeAdapter({ onEvent: normalize });
     const wrapper = mount(SchemaRenderer, {
       props: { page: makePage([]), adapter, onEvent },
-      global: { plugins: [ElementPlus] },
     });
     await fire(wrapper);
 

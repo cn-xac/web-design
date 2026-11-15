@@ -76,15 +76,6 @@ describe("设计器控件跟随适配包（D3）", () => {
     expect(wrapper.emitted("export-schema")).toBeTruthy();
   });
 
-  it.skipIf(!__HAS_ELEMENT_PLUS__)("适配包提供 designer kit 时，设计器用该 UI 库的控件且不告警", async () => {
-    // 不覆盖 provide：走 tests/setup.ts 注入的 Element Plus 适配包（带完整 designerKit）
-    const wrapper = await mountDesigner();
-
-    expect(wrapper.html()).toContain("el-button");
-    expect(wrapper.findAll("button.wbd-btn").length).toBe(0);
-    // 只断言「designer kit 告警」未出现：Element Plus 适配包下 Vue 自身可能有组件解析类 warning，与本次契约无关
-    expect(warnSpy.mock.calls.filter((call) => String(call[0]).includes("designer kit"))).toHaveLength(0);
-  });
 });
 
 /**
@@ -113,13 +104,6 @@ describe("物料面板按适配包能力置灰", () => {
     const enabled = wrapper.findAll(".palette__item").filter((item) => !item.classes().includes("is-disabled"));
     expect(enabled).toHaveLength(2);
     expect(enabled.every((item) => item.attributes("draggable") === "true")).toBe(true);
-  });
-
-  it.skipIf(!__HAS_ELEMENT_PLUS__)("适配包覆盖全部物料时不置灰", async () => {
-    // Element Plus 适配包实现了全部协议物料；子表单由引擎渲染，无需组件实现，同样可用
-    const wrapper = await mountDesigner();
-    expect(wrapper.findAll(".palette__item.is-disabled")).toHaveLength(0);
-    expect(wrapper.text()).not.toContain("当前 UI 库未实现");
   });
 
   it("声明了物料但一个都没实现时全部置灰，并在底部说明", async () => {

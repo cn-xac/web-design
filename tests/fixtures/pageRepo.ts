@@ -4,7 +4,7 @@
  * 接真后端时只替换这一层，设计器与渲染器无需改动。
  *
  * 注：原在 apps/playground/src/api/pageRepo.ts，精简 apps 时迁入 tests/fixtures。
- * 已知组件集合改用 Element Plus 适配包的 materials（业务组件 biz-risk-badge
+ * 已知组件集合取 core 通用物料清单（业务组件 biz-risk-badge
  * 不在其中，校验时仅告警、不影响 valid）。
  */
 
@@ -14,16 +14,16 @@ import { compactPage } from "@x-ac/web-design-core";
 import { createRegistry } from "@x-ac/web-design-core";
 import { migratePage } from "@x-ac/web-design-core";
 import { validatePage } from "@x-ac/web-design-core";
-import { elementPlusAdapter } from "@x-ac/web-design-vue-element-plus";
+import { MATERIALS } from "@x-ac/web-design-core";
 import { employeeOnboardTemplate, ticketTemplate } from "./templates";
 
 const STORAGE_KEY = "vue-design:pages:v1";
 
 /**
- * 校验用的组件集合取 Element Plus 适配包这一份；
+ * 校验用的组件集合取 core 通用清单；
  * 业务物料 biz-risk-badge 不在其中，保存时只会产生 unknown-component 告警。
  */
-const KNOWN_COMPONENTS = createRegistry(elementPlusAdapter.materials).knownComponents();
+const KNOWN_COMPONENTS = createRegistry(MATERIALS).knownComponents();
 
 export interface PageRecord {
   id: string;

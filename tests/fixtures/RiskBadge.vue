@@ -2,7 +2,7 @@
 /**
  * 业务自定义物料示例（T-032）：风险等级徽章。
  *
- * 刻意不依赖 Element Plus —— 用来证明「业务组件可以完全自研，
+ * 刻意不依赖任何 UI 库 —— 用来证明「业务组件可以完全自研，
  * 只靠 registerMaterials 一份声明就进设计器物面板、属性面板和渲染器」。
  *
  * 注：原在 apps/playground/src/materials/RiskBadge.vue，精简 apps 时迁入 tests/fixtures。

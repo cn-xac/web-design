@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, beforeAll } from "vitest";
 import { mount } from "@vue/test-utils";
-import ElementPlus from "element-plus";
 import {
   formatSpacing,
   normalizeLength,
@@ -102,58 +101,4 @@ describe("渲染时应用通用间距", () => {
     expect(overridden.margin).toBe("0");
   });
 
-  it.skipIf(!__HAS_ELEMENT_PLUS__)("margin / padding 落到真实 DOM", () => {
-    const wrapper = mount(SchemaRenderer, {
-      props: {
-        page: {
-          schemaVersion: "1.0.0",
-          id: "p1",
-          type: "page",
-          state: {},
-          children: [
-            {
-              id: "n1",
-              component: "text",
-              props: { text: "带间距的文本" },
-              style: { margin: "8px 12px", padding: "4px" },
-            },
-          ],
-        },
-      },
-      global: { plugins: [ElementPlus] },
-    });
-
-    const element = wrapper.find("p").element as HTMLElement;
-    expect(element.style.margin).toBe("8px 12px");
-    expect(element.style.padding).toBe("4px");
-  });
-
-  it.skipIf(!__HAS_ELEMENT_PLUS__)("表单控件的内边距作用在字段外壳上，不挤压输入框内部", () => {
-    const wrapper = mount(SchemaRenderer, {
-      props: {
-        page: {
-          schemaVersion: "1.0.0",
-          id: "p2",
-          type: "page",
-          state: {},
-          children: [
-            {
-              id: "n2",
-              component: "input",
-              props: { label: "姓名", modelValue: "{{form.name}}" },
-              style: { padding: "10px", marginBottom: "16px" },
-            },
-          ],
-        },
-      },
-      global: { plugins: [ElementPlus] },
-    });
-
-    const shell = wrapper.find(".wb-field").element as HTMLElement;
-    expect(shell.style.padding).toBe("10px");
-    expect(shell.style.marginBottom).toBe("16px");
-
-    const input = wrapper.find("input").element as HTMLElement;
-    expect(input.style.padding).toBe("");
-  });
 });

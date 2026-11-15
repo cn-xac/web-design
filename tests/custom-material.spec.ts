@@ -8,7 +8,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import ElementPlus from "element-plus";
 import { defineComponent, h } from "vue";
 import {
   createEmptyPage,
@@ -20,7 +19,7 @@ import {
   type UiAdapter,
 } from "@x-ac/web-design-core";
 import { SchemaRenderer, UI_ADAPTER } from "@x-ac/web-design-vue";
-import { elementPlusAdapter } from "@x-ac/web-design-vue-element-plus";
+import { testAdapter } from "@/fixtures/test-adapter";
 import { useDesignerStore } from "@/designer/store";
 import PropsEditor from "@/designer/components/PropsEditor.vue";
 import PalettePanel from "@/designer/components/PalettePanel.vue";
@@ -117,19 +116,19 @@ describe("defineMaterial 归一化", () => {
 
 describe("registerMaterials 组合", () => {
   it("返回新适配包，原适配包不受影响", () => {
-    const before = elementPlusAdapter.materials.length;
-    const adapter = registerMaterials(elementPlusAdapter, [riskBadge]);
+    const before = testAdapter.materials.length;
+    const adapter = registerMaterials(testAdapter, [riskBadge]);
 
-    expect(adapter).not.toBe(elementPlusAdapter);
-    expect(adapter.materials).not.toBe(elementPlusAdapter.materials);
-    expect(elementPlusAdapter.materials).toHaveLength(before);
+    expect(adapter).not.toBe(testAdapter);
+    expect(adapter.materials).not.toBe(testAdapter.materials);
+    expect(testAdapter.materials).toHaveLength(before);
     expect(adapter.materials).toHaveLength(before + 1);
-    expect(adapter.name).toBe(elementPlusAdapter.name);
-    expect(adapter.actions).toBe(elementPlusAdapter.actions);
+    expect(adapter.name).toBe(testAdapter.name);
+    expect(adapter.actions).toBe(testAdapter.actions);
   });
 
   it("组件表按协议名归一写入，物料目录可按裸名或协议名查到", () => {
-    const adapter = registerMaterials(elementPlusAdapter, [riskBadge]);
+    const adapter = registerMaterials(testAdapter, [riskBadge]);
     const registry = createRegistry(adapter.materials);
 
     expect(adapter.components["ec-biz-risk-badge"]).toBe(RiskBadge);
@@ -138,21 +137,16 @@ describe("registerMaterials 组合", () => {
     expect(registry.knownComponents().has("ec-biz-risk-badge")).toBe(true);
   });
 
-  it.skipIf(!__HAS_ELEMENT_PLUS__)("已提供实现的业务物料不再出现在缺失清单里，缺实现的仍在", () => {
-    const adapter = registerMaterials(elementPlusAdapter, [riskBadge, { component: "biz-pending" }]);
-    expect(missingComponents(adapter)).toEqual(["biz-pending"]);
-  });
-
   it("空声明原样返回同一引用，不产生多余副本", () => {
-    expect(registerMaterials(elementPlusAdapter, [])).toBe(elementPlusAdapter);
+    expect(registerMaterials(testAdapter, [])).toBe(testAdapter);
   });
 
   it("同一批重复注册直接报错，而不是悄悄只留一个", () => {
-    expect(() => registerMaterials(elementPlusAdapter, [riskBadge, riskBadge])).toThrow(/重复注册/);
+    expect(() => registerMaterials(testAdapter, [riskBadge, riskBadge])).toThrow(/重复注册/);
   });
 
   it("与已有物料同名默认报错，overwrite 才覆盖", () => {
-    const adapter = registerMaterials(elementPlusAdapter, [riskBadge]);
+    const adapter = registerMaterials(testAdapter, [riskBadge]);
     expect(() => registerMaterials(adapter, [riskBadge])).toThrow(/同名/);
 
     const overwritten = registerMaterials(
@@ -176,12 +170,11 @@ describe("业务物料进入渲染器", () => {
     };
     return mount(SchemaRenderer, {
       props: { page, adapter: adapter ?? undefined },
-      global: { plugins: [ElementPlus] },
     });
   }
 
   it("注册后按自己的实现渲染，不走未知组件占位", () => {
-    const adapter = registerMaterials(elementPlusAdapter, [riskBadge]);
+    const adapter = registerMaterials(testAdapter, [riskBadge]);
     const wrapper = mountPage(adapter, "biz-risk-badge", { text: "高风险", level: "高" });
 
     expect(wrapper.text()).toContain("高风险");
@@ -192,7 +185,7 @@ describe("业务物料进入渲染器", () => {
   });
 
   it("未注册时降级占位，不白屏", () => {
-    const wrapper = mountPage(elementPlusAdapter, "biz-risk-badge", { text: "高风险" });
+    const wrapper = mountPage(testAdapter, "biz-risk-badge", { text: "高风险" });
     expect(wrapper.find(".wb-node__unknown").exists()).toBe(true);
     expect(wrapper.text()).toContain("biz-risk-badge");
   });
@@ -215,7 +208,7 @@ describe("业务物料进入设计器面板", () => {
   }
 
   it("属性面板列出业务字段，color 用取色控件、select 用下拉", () => {
-    const adapter = withoutKit(registerMaterials(elementPlusAdapter, [riskBadge]));
+    const adapter = withoutKit(registerMaterials(testAdapter, [riskBadge]));
     setup(adapter);
     const wrapper = mountProps(adapter);
 
@@ -231,7 +224,7 @@ describe("业务物料进入设计器面板", () => {
       props: { modelValue: { type: String, default: "" } },
       setup: () => () => h("div", { class: "probe-editor" }, "自定义编辑器"),
     });
-    const base = registerMaterials(elementPlusAdapter, [riskBadge]);
+    const base = registerMaterials(testAdapter, [riskBadge]);
     const adapter: UiAdapter<unknown> = { ...withoutKit(base), editors: { text: Probe } };
     setup(adapter);
 
@@ -241,7 +234,7 @@ describe("业务物料进入设计器面板", () => {
   });
 
   it("物料面板出现业务物料，并带「自」标记", () => {
-    const adapter = withoutKit(registerMaterials(elementPlusAdapter, [riskBadge]));
+    const adapter = withoutKit(registerMaterials(testAdapter, [riskBadge]));
     setup(adapter);
     const wrapper = mount(PalettePanel, {
       global: { provide: { [UI_ADAPTER as symbol]: adapter } },

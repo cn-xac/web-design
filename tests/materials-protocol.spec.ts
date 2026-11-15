@@ -154,35 +154,6 @@ describe("适配包组合", () => {
 });
 
 describe("渲染器吃 ec- 前缀", () => {
-  it.skipIf(!__HAS_ELEMENT_PLUS__)("带前缀的节点能渲染出真实控件", async () => {
-    const { mount } = await import("@vue/test-utils");
-    const { default: ElementPlus } = await import("element-plus");
-    const { SchemaRenderer } = await import("@x-ac/web-design-vue");
-    const node: NodeSchema = {
-      id: "n_name",
-      component: "ec-input",
-      props: { label: "姓名", placeholder: "请输入姓名", modelValue: "{{form.name}}" },
-      rules: [{ type: "required" }],
-    };
-    const page: PageSchema = {
-      schemaVersion: "1.0.0",
-      id: "page_prefix",
-      type: "page",
-      meta: { title: "前缀渲染", device: "pc" },
-      state: { form: { name: "" } },
-      children: [node],
-    };
-
-    const wrapper = mount(SchemaRenderer, {
-      props: { page, mode: "view" },
-      global: { plugins: [ElementPlus] },
-    });
-
-    expect(wrapper.find("input").exists()).toBe(true);
-    expect(wrapper.text()).toContain("姓名");
-    expect(wrapper.find(".wb-field__req").exists()).toBe(true);
-  });
-
   it("未注入适配包时降级为占位，不抛错", async () => {
     const { mount } = await import("@vue/test-utils");
     const { SchemaRenderer, UI_ADAPTER } = await import("@x-ac/web-design-vue");

@@ -2,7 +2,7 @@
 /**
  * React 引擎的适配包链路（T-033）。
  *
- * 与 Vue 侧 elementPlusAdapter 是同一份契约，所以断言也按同一组语义写：
+ * 与 Vue 侧适配包是同一份契约，所以断言也按同一组语义写：
  *   - 内置 adapter 自己就是契约的合法实现；
  *   - registerMaterials 之后业务物料能渲染、能校验、能吃到默认样式；
  *   - 换绑定通道时 Schema 不用改。
