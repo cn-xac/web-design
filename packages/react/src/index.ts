@@ -9,6 +9,9 @@ import "./styles.css";
 export { SchemaRenderer } from "./SchemaRenderer";
 export type { SchemaRendererHandle, SchemaRendererProps } from "./SchemaRenderer";
 export { SchemaNode, isActionRegistered } from "./SchemaNode";
+/** 内嵌页面片段：共用宿主 scope，把数据里的 schema 渲染成页面（标签页内容等） */
+export { SchemaFragment } from "./SchemaFragment";
+export type { SchemaFragmentProps } from "./SchemaFragment";
 export { COMPONENTS, resolveComponent } from "./components";
 export type { ControlProps } from "./components";
 export { RenderContext, useRenderContext } from "./context";

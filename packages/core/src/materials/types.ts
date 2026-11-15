@@ -15,7 +15,13 @@ export type PropFieldType =
   | "color"
   | "options"
   | "optionPair"
-  | "columns";
+  | "columns"
+  /**
+   * 标签项结构化编辑器：由物料的 items 字段声明，属性面板据此弹出
+   * 「标签项维护」弹窗（增删改 + 拖拽排序）。具体弹窗由适配包的 editors 提供，
+   * 引擎只认这个槽位名，不绑定任何 UI 库或具体物料。
+   */
+  | "tabItems";
 
 /**
  * 属性分组。属性面板按组折叠：UI 库组件的属性动辄二十几个，

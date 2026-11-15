@@ -3,14 +3,14 @@
  * 递归渲染器。入参只有 PageSchema，不依赖设计器任何模块。
  * mode=view 挂事件、跑动作；mode=edit 只做视觉呈现，供设计器包裹交互。
  */
-import { computed, inject } from "vue";
+import { computed, inject, provide } from "vue";
 import type { CSSProperties, Component } from "vue";
 import type { NodeSchema } from "@x-ac/web-design-core";
 import { DEFAULT_BINDING, camelizeEventName, createEventPayload, materialKey, runEventHooks } from "@x-ac/web-design-core";
 import FieldShell from "./FieldShell.vue";
 import SchemaSubForm from "./SchemaSubForm.vue";
 import { extractPath, getByPath, isBindable, isRequired, resolveDirectiveVisibility, resolveLoopInstances, resolveNodeStyle, resolveValue, resolveVisibility, setByPath } from "@x-ac/web-design-core";
-import { BINDING_BASE, DESIGNER_SCENE, RENDER_CONTEXT, useUiAdapter } from "./context";
+import { BINDING_BASE, DESIGNER_SCENE, RENDER_CONTEXT, RENDER_ENV, useUiAdapter } from "./context";
 import { useMaterialCatalog } from "../materials/catalog";
 import { runNodeActions } from "./runActions";
 
@@ -36,6 +36,23 @@ const adapter = useUiAdapter();
 const catalog = useMaterialCatalog();
 /** 绑定前缀：默认 form；子表单内由上层 BindingScope 注入当前组路径，实现无限嵌套 */
 const bindingBase = inject(BINDING_BASE, "form");
+
+/**
+ * 向下暴露渲染环境：标签页这类物料的「内容」是数据里的另一份 schema，
+ * 需要 scope 与 mode 才能递归渲染。用 getter 保持对 props 的跟踪，
+ * 避免设计态 / 预览态切换后子物料拿到过期值。
+ */
+provide(RENDER_ENV, {
+  get scope() {
+    return props.scope;
+  },
+  get mode() {
+    return props.mode;
+  },
+  get design() {
+    return props.design;
+  },
+});
 
 const material = computed(() => catalog.get(props.node.component));
 // 引擎按 kind 结构渲染的物料（如子表单）没有 UI 库组件实现，不算未知

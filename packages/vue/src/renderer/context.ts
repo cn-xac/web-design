@@ -71,3 +71,19 @@ export function materialFrom(adapter: UiAdapter<unknown> | null, key: string): M
  * 从而让组内字段自动落到 form.items[i].<id>，天然支持无限嵌套。
  */
 export const BINDING_BASE: InjectionKey<string> = Symbol("wb-binding-base");
+
+/**
+ * 当前渲染环境：页面作用域 + 渲染模式 + 是否设计态。
+ *
+ * 逐节点的 scope 通过 props 传递，但物料组件是由 SchemaNode 用 `<component :is>`
+ * 渲染的，拿不到 props.scope。标签页这类「内容要按 schema 递归渲染」的物料
+ * 只能从注入里取环境，否则就得把 scope 当普通 prop 透传，既污染属性面板、
+ * 也会被 Schema 序列化进页面。
+ */
+export interface RenderEnv {
+  scope: Record<string, unknown>;
+  mode: "view" | "edit";
+  design: boolean;
+}
+
+export const RENDER_ENV: InjectionKey<RenderEnv> = Symbol("wb-render-env");

@@ -46,6 +46,71 @@ export function parsePairs(raw: unknown): PairItem[] {
     });
 }
 
+/**
+ * 结构化标签项：标签页 items 从「标题:内容」字符串升级后的形态。
+ *
+ * 为什么保留字符串入口：历史页面把 tabs 的 items 存成成对字符串，
+ * 直接改协议会让旧页面渲染不出来。parseTabItems 负责把两种形态归一，
+ * 运行时与设计器只认 TabItem[]，不再各自判空。
+ */
+export interface TabItem {
+  /** 稳定标识：拖拽排序 / 增删改都以它为准，不能随下标漂移 */
+  id: string;
+  label: string;
+  /** 自定义标记：用于「按数据控制默认激活哪个页签」 */
+  mark?: string;
+  /** 纯文本内容（旧字符串的 value 落到这里） */
+  text?: string;
+  /** 绑定数据里的 schema 路径，运行时按 schema 协议解析为页面 */
+  dataPath?: string;
+  /** 外部 URL：返回 schema JSON，运行时拉取后按 schema 协议解析为页面 */
+  url?: string;
+  method?: "get" | "post";
+}
+
+/**
+ * 生成标签项 id。只在「新建」时调用：
+ * 已存在的项必须沿用原 id，否则拖拽排序后 key 漂移、输入框失焦、内容重挂载。
+ */
+export function createTabId(prefix = "tab"): string {
+  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * 归一化标签页 items。
+ * - 结构化数组：逐项补齐 id / label / mark / text / dataPath / url，缺 id 用 `tab{index}` 兜底；
+ * - 旧成对字符串：走 parsePairs，内容落到 text；
+ * - 其它脏值：返回空数组，绝不抛错。
+ *
+ * 与 parsePairs 的分工：parsePairs 只产出 {label,value}（显示层面的最小契约），
+ * parseTabItems 在其之上补齐 id / mark / 内容来源，供设计器弹窗与运行时内嵌渲染使用。
+ */
+export function parseTabItems(raw: unknown): TabItem[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((entry, index) => {
+        const record = (entry ?? {}) as Record<string, unknown>;
+        const label = String(record.label ?? record.title ?? "").trim();
+        const item: TabItem = { id: String(record.id ?? `tab${index}`), label };
+
+        const mark = record.mark ?? record.tag;
+        if (mark !== undefined && mark !== null && String(mark) !== "") item.mark = String(mark);
+
+        const text = record.text ?? record.value ?? record.content;
+        if (text !== undefined && text !== null) item.text = String(text);
+
+        if (record.dataPath) item.dataPath = String(record.dataPath);
+        if (record.url) item.url = String(record.url);
+        if (record.method === "get" || record.method === "post") item.method = record.method;
+
+        return item;
+      })
+      .filter((item) => item.label !== "");
+  }
+
+  return parsePairs(raw).map((pair, index) => ({ id: `tab${index}`, label: pair.label, text: pair.value }));
+}
+
 /** 只要标签（面包屑、分段控制器这类只需要一项文字） */
 export function parseLabels(raw: unknown): string[] {
   if (Array.isArray(raw)) {

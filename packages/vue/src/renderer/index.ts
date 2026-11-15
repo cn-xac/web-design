@@ -2,12 +2,14 @@ export { default as SchemaRenderer } from "./SchemaRenderer.vue";
 /** 渲染标签的语义化别名：<SchemaPage :page="schema" v-model:data="formData" @submit="..." /> */
 export { default as SchemaPage } from "./SchemaRenderer.vue";
 export { default as SchemaNode } from "./SchemaNode.vue";
+/** 内嵌页面片段：共用宿主 scope，把数据里的 schema 渲染成页面（标签页内容等） */
+export { default as SchemaFragment } from "./SchemaFragment.vue";
 export { runNodeActions } from "./runActions";
 export type { NodeActionContext } from "./runActions";
 export { usePageScope } from "./usePageScope";
 export type { PageScopeApi } from "./usePageScope";
-export { DESIGNER_SCENE, RENDER_CONTEXT, UI_ADAPTER, materialFrom, useUiAdapter } from "./context";
-export type { DesignerScene, RenderContext } from "./context";
+export { DESIGNER_SCENE, RENDER_CONTEXT, RENDER_ENV, UI_ADAPTER, materialFrom, useUiAdapter } from "./context";
+export type { DesignerScene, RenderContext, RenderEnv } from "./context";
 
 // 动作协议与校验在 core，渲染器出口透传一份，宿主只装一个包也能用
 export {
