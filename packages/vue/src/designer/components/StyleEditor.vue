@@ -37,19 +37,19 @@ function openCalculation(): void {
 }
 
 /** 条件摘要：让属性面板在不打开弹窗时也能看出配置状态 */
-function conditionSummary(kind: "show" | "hide"): string {
-  const group = node.value?.visibility?.[kind];
+function conditionSummary(): string {
+  const group = node.value?.visibility?.when;
   if (!group?.rows.length) return "未配置";
   const mode = CONDITION_MODE_OPTIONS.find((option) => option.value === group.mode)?.label ?? group.mode;
-  return `${group.rows.length} 条 · ${mode}`;
+  const action = node.value?.visibility?.action ?? "show";
+  return `${group.rows.length} 条 · ${mode} · ${action === "hide" ? "命中隐藏" : "命中显示"}`;
 }
 
-function openConditions(kind: "show" | "hide"): void {
+function openConditions(): void {
   if (!node.value) return;
   conditionDialog.open({
     nodeId: node.value.id,
     label: String(node.value.props?.label ?? node.value.component),
-    kind,
   });
 }
 
@@ -316,18 +316,11 @@ function directiveValue(name: "show" | "if" | "for"): string {
 
     <div class="style__section">显示 / 隐藏条件</div>
     <div class="style__row style__row--block">
-      <label>显示条件</label>
-      <button type="button" class="style__cond-btn" @click="openConditions('show')">
-        {{ conditionSummary("show") }} · 配置
+      <label>条件显隐</label>
+      <button type="button" class="style__cond-btn" @click="openConditions()">
+        {{ conditionSummary() }} · 配置
       </button>
-      <div class="style__tip">命中即显示，优先级高于隐藏条件</div>
-    </div>
-    <div class="style__row style__row--block">
-      <label>隐藏条件</label>
-      <button type="button" class="style__cond-btn" @click="openConditions('hide')">
-        {{ conditionSummary("hide") }} · 配置
-      </button>
-      <div class="style__tip">仅在显示条件未命中时生效</div>
+      <div class="style__tip">一组条件 + 命中动作，未命中取反，无中间态</div>
     </div>
 
     <div class="style__section">显示与循环（旧指令）</div>

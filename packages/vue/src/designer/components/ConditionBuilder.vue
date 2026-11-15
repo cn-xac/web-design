@@ -15,12 +15,14 @@ import {
   CONDITION_AGGREGATES,
   CONDITION_MODE_OPTIONS,
   CONDITION_OPERATOR_OPTIONS,
+  VISIBILITY_ACTIONS,
   collectConditionElements,
   findLocation,
   validateAdvancedExpression,
   type ConditionGroup,
   type ConditionMode,
   type ConditionRow,
+  type VisibilityAction,
   type VisibilityConfig,
 } from "@x-ac/web-design-core";
 import { useDesignerStore } from "../store";
@@ -46,14 +48,13 @@ function blankRow(): DraftRow {
 }
 
 const draft = ref<Draft>({ mode: "and", rows: [blankRow()], expression: "" });
+const action = ref<VisibilityAction>("show");
 
 const elements = computed(() =>
   collectConditionElements(store.page, { nodeId: dialog.target.value?.nodeId }),
 );
 
-const title = computed(() =>
-  dialog.target.value?.kind === "hide" ? "配置隐藏条件" : "配置显示条件",
-);
+const title = computed(() => "配置显示 / 隐藏条件");
 
 const expressionError = computed(() => {
   if (draft.value.mode !== "advanced") return "";
@@ -69,7 +70,7 @@ const scopeTip = computed(() => {
 });
 
 watch(
-  () => [dialog.visible.value, dialog.target.value?.nodeId, dialog.target.value?.kind] as const,
+  () => [dialog.visible.value, dialog.target.value?.nodeId] as const,
   ([visible]) => {
     if (visible) load();
   },
@@ -78,9 +79,11 @@ watch(
 
 function load(): void {
   const target = dialog.target.value;
-  const group = target
-    ? findLocation(store.page.children, target.nodeId)?.node?.visibility?.[target.kind]
+  const visibility = target
+    ? findLocation(store.page.children, target.nodeId)?.node?.visibility
     : undefined;
+  const group = visibility?.when;
+  action.value = visibility?.action ?? "show";
   if (group) {
     draft.value = {
       mode: group.mode,
@@ -146,28 +149,29 @@ function save(): void {
     return;
   }
 
-  const node = findLocation(store.page.children, target.nodeId)?.node;
-  const next: VisibilityConfig = { ...(node?.visibility ?? {}) };
   const rows = cleanRows(draft.value.rows);
   if (!rows.length) {
-    delete next[target.kind];
+    store.setVisibility(undefined);
   } else {
-    next[target.kind] = {
-      mode: draft.value.mode,
-      rows,
-      ...(draft.value.mode === "advanced" && draft.value.expression
-        ? { expression: draft.value.expression.trim() }
-        : {}),
+    const next: VisibilityConfig = {
+      when: {
+        mode: draft.value.mode,
+        rows,
+        ...(draft.value.mode === "advanced" && draft.value.expression
+          ? { expression: draft.value.expression.trim() }
+          : {}),
+      },
+      action: action.value,
     };
+    store.setVisibility(next);
   }
-
-  store.setVisibility(Object.keys(next).length ? next : undefined);
   dialog.close();
   notify("显示隐藏条件已更新", "success");
 }
 
 function clear(): void {
   draft.value = { mode: "and", rows: [blankRow()], expression: "" };
+  action.value = "show";
 }
 
 function setMode(mode: ConditionMode): void {
@@ -186,8 +190,23 @@ function setMode(mode: ConditionMode): void {
     @close="dialog.close()"
   >
     <div class="cond__hint">
-      命中「显示」条件时一定显示（优先于隐藏）；否则命中「隐藏」条件时隐藏。
+      条件命中执行下方「命中时动作」，未命中则执行相反动作——始终有明确结果，无中间态。
       <br />{{ scopeTip }}
+    </div>
+
+    <div class="cond__section">命中时动作</div>
+    <div class="cond__modes">
+      <button
+        v-for="option in VISIBILITY_ACTIONS"
+        :key="option.value"
+        type="button"
+        class="cond__mode"
+        :class="{ 'is-active': action === option.value }"
+        :title="option.hint"
+        @click="action = option.value"
+      >
+        {{ option.label }}
+      </button>
     </div>
 
     <div class="cond__section">条件间关系</div>

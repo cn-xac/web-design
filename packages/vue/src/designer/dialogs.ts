@@ -93,11 +93,10 @@ export function useExternalSourceDialog() {
 
 /* ---------------- 显示 / 隐藏条件（r5u4Ul） ---------------- */
 
-/** 条件配置的落点：哪个节点的显示条件或隐藏条件 */
+/** 条件配置的落点：哪个节点（1.3.0 起单组配置，不再区分 show / hide） */
 export interface ConditionTarget {
   nodeId: string;
   label: string;
-  kind: "show" | "hide";
 }
 
 const conditionVisible = ref(false);
