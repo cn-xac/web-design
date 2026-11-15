@@ -37,6 +37,7 @@ import { useDesignerStore } from "../store";
 import { useCalculationDialog } from "../dialogs";
 import { useNotify } from "../ui/kit";
 import ModalShell from "../ui/ModalShell.vue";
+import CalculationHelpDialog from "./CalculationHelpDialog.vue";
 
 interface DraftOperand {
   path: string;
@@ -57,6 +58,8 @@ const notify = useNotify();
 const formulaEl = ref<HTMLTextAreaElement | null>(null);
 /** 当前查看说明的函数；悬停 / 聚焦时切换，点击按钮仍只负责插入签名 */
 const activeFn = ref<CalculationFunction | null>(null);
+/** 完整使用说明（内容较长，单独一层弹窗承载） */
+const helpVisible = ref(false);
 
 const draft = ref({
   operands: [] as DraftOperand[],
@@ -257,6 +260,7 @@ function clear(): void {
     v-if="dialog.visible.value && dialog.target.value"
     title="配置数据计算"
     width="760px"
+    :esc-to-close="!helpVisible"
     @close="dialog.close()"
   >
     <div class="calc__hint">
@@ -304,7 +308,16 @@ function clear(): void {
       {{ formulaError || "用变量名引用参与元素；支持 + - * / %、比较、三元与括号。" }}
     </div>
 
-    <div class="calc__fn-label">高级函数（点击插入到光标处）</div>
+    <div class="calc__fn-title">
+      <span class="calc__fn-label">高级函数（点击插入到光标处）</span>
+      <button
+        type="button"
+        class="calc__help-btn"
+        title="查看完整使用说明（通用规则 / 18 个函数 / 业务配方 / 排错）"
+        aria-label="查看完整使用说明"
+        @click="helpVisible = true"
+      >?</button>
+    </div>
     <div v-for="group in functionGroups" :key="group.group" class="calc__fn-group">
       <span class="calc__fn-group-name">{{ group.group }}</span>
       <button
@@ -331,7 +344,7 @@ function clear(): void {
       <div class="calc__fn-help-desc">{{ activeFn.description }}</div>
     </div>
     <div v-else class="calc__fn-help calc__fn-help--empty">
-      悬停函数名查看参数、返回值与示例；点击函数名把签名插入算式。
+      悬停函数名查看单函数说明，点击函数插入签名；点右侧 ? 查看完整使用说明。
     </div>
 
     <div class="calc__section">输出设置</div>
@@ -410,6 +423,7 @@ function clear(): void {
       <button type="button" class="calc__ok" @click="save">确定</button>
     </template>
   </ModalShell>
+  <CalculationHelpDialog v-if="helpVisible" @close="helpVisible = false" />
 </template>
 
 <style scoped>
@@ -529,10 +543,34 @@ function clear(): void {
 .calc__tip.is-error {
   color: var(--wb-danger);
 }
-.calc__fn-label {
+.calc__fn-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 10px 0 6px;
+}
+.calc__fn-label {
   font-size: 11.5px;
   color: var(--wb-ink3);
+}
+.calc__help-btn {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border: 1px solid var(--wb-line);
+  border-radius: 50%;
+  background: #fff;
+  padding: 0;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  color: var(--wb-ink3);
+  cursor: pointer;
+}
+.calc__help-btn:hover {
+  border-color: var(--wb-primary);
+  background: var(--wb-primary-soft);
+  color: var(--wb-primary);
 }
 .calc__fn-group {
   display: flex;

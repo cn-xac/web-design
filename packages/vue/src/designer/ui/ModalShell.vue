@@ -8,11 +8,15 @@
  */
 import { onBeforeUnmount, onMounted } from "vue";
 
-withDefaults(defineProps<{ title: string; width?: string }>(), { width: "520px" });
+const props = withDefaults(
+  defineProps<{ title: string; width?: string; escToClose?: boolean }>(),
+  { width: "520px", escToClose: true },
+);
 const emit = defineEmits<{ close: [] }>();
 
+/** 叠加二级弹窗时，外层可关掉 ESC，避免一次 ESC 把两个弹窗都关掉、丢失未保存草稿 */
 function onKeydown(event: KeyboardEvent): void {
-  if (event.key === "Escape") emit("close");
+  if (props.escToClose && event.key === "Escape") emit("close");
 }
 
 onMounted(() => window.addEventListener("keydown", onKeydown));
