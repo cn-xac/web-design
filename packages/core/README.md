@@ -102,7 +102,7 @@ console.log(CALCULATION_FUNCTIONS.map((fn) => fn.name));
 - 安全：通用 `{{path}}` 绑定表达式**仍禁函数调用**；只有计算模块通过 `evaluateWithFunctions()` 显式注入静态白名单函数表时才允许调用，函数名只是协议符号。
 - 子表单：明细字段路径用 `[0]` 占位，指定 `sum`/`avg`/`min`/`max` 按全部行聚合；子表单内目标逐行回填。
 - 参与条件复用 `ConditionGroup` / `evaluateConditionGroup`；保存前用 `validateCalculationConfig()` 校验别名、算式与聚合口径。
-- 每个函数在 `CALCULATION_FUNCTIONS` 里都带 `params` / `returns` / `example` 元数据，设计器弹窗悬停函数名即可查看；完整手册见容器根 `docs/CALCULATION_FUNCTIONS.md`。
+- 每个函数在 `CALCULATION_FUNCTIONS` 里都带 `params` / `returns` / `example` 元数据，设计器弹窗悬停函数名即可查看；标题右侧「?」打开完整说明弹窗，内容还包括 `calculation/usage.ts` 的 `CALCULATION_USAGE_NOTES` / `CALCULATION_RECIPES` / `CALCULATION_TROUBLESHOOTING`（与手册同源）。完整手册见容器根 `docs/CALCULATION_FUNCTIONS.md`。
 
 ## 其他能力
 
