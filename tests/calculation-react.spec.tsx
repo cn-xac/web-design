@@ -134,6 +134,22 @@ async function openCalculationDialog(container: HTMLElement) {
 }
 
 describe("React 设计器：数据计算弹窗", () => {
+  it("属性面板头部有「高级计算」入口，点击直接打开配置弹窗", async () => {
+    const ui = setup(
+      pageWith([{ id: "f1", component: "text", props: { label: "合计" } }]),
+    );
+    try {
+      await ui.render();
+      await ui.select("f1");
+      const entry = ui.container.querySelector(".props__calc");
+      expect(entry?.textContent).toContain("高级计算");
+      await click(entry);
+      expect(ui.container.querySelector(".wbd-modal__title")?.textContent).toContain("配置高级计算");
+    } finally {
+      await ui.cleanup();
+    }
+  });
+
   it("选参与元素 + 高级函数算式 → 保存后写入 node.calculation，并自动绑定文字元素", async () => {
     const ui = setup(
       pageWith([
@@ -146,7 +162,7 @@ describe("React 设计器：数据计算弹窗", () => {
       await ui.select("f1");
       await openCalculationDialog(ui.container);
 
-      expect(ui.container.querySelector(".wbd-modal__title")?.textContent).toContain("配置数据计算");
+      expect(ui.container.querySelector(".wbd-modal__title")?.textContent).toContain("配置高级计算");
       expect(ui.container.querySelectorAll(".calc__fn").length).toBeGreaterThan(10);
 
       await setNativeValue(ui.container.querySelector(".calc__element") as HTMLSelectElement, "form.f2");

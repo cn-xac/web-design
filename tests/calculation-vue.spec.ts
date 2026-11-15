@@ -114,11 +114,23 @@ async function openCalculationDialog(wrapper: Awaited<ReturnType<typeof mountDes
 }
 
 describe("Vue 设计器：数据计算弹窗", () => {
+  it("属性面板头部有「高级计算」入口，点击直接打开配置弹窗", async () => {
+    const { wrapper } = await mountDesigner();
+    // 默认就是「属性」Tab，不需要先切到「样式」
+    const entry = wrapper.find(".props__calc");
+    expect(entry.exists()).toBe(true);
+    expect(entry.text()).toContain("高级计算");
+    await entry.trigger("click");
+    await tick();
+    expect(wrapper.find(".wbd-modal__title").text()).toContain("配置高级计算");
+    wrapper.unmount();
+  });
+
   it("选参与元素 + 高级函数算式 → 保存后写入 node.calculation，并自动给文字元素绑定结果", async () => {
     const { wrapper, store } = await mountDesigner();
     await openCalculationDialog(wrapper);
 
-    expect(wrapper.find(".wbd-modal__title").text()).toContain("配置数据计算");
+    expect(wrapper.find(".wbd-modal__title").text()).toContain("配置高级计算");
     expect(wrapper.findAll(".calc__fn").length).toBeGreaterThan(10);
 
     await wrapper.find(".calc__element").setValue("form.f2");
