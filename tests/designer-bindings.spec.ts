@@ -470,7 +470,7 @@ describe("设计器：外部数据源弹窗交互修正", () => {
     expect(row.find(".ext__del").exists()).toBe(true);
   });
 
-  it("响应映射的目标元素与列表字段并排，说明收进问号图标", async () => {
+  it("列表字段在数据源顶层，映射卡片里只留目标元素", async () => {
     const { wrapper } = await openExternalDialog();
 
     const addResponse = wrapper
@@ -479,10 +479,16 @@ describe("设计器：外部数据源弹窗交互修正", () => {
     await addResponse!.trigger("click");
     await tick();
 
-    // 目标元素与列表字段在同一行，各占一半
-    const targetRow = wrapper.find(".ext__resp-target");
-    expect(targetRow.exists()).toBe(true);
-    expect(targetRow.findAll("input").length).toBe(1);
+    // 列表字段属于数据源：全弹窗只有一个，且在映射卡片之外
+    const listInputs = wrapper
+      .findAll("input")
+      .filter((item) => (item.attributes("placeholder") ?? "").includes("数组所在的字段"));
+    expect(listInputs).toHaveLength(1);
+    const firstCard = wrapper.find(".ext__resp");
+    expect(firstCard.element.contains(listInputs[0]!.element)).toBe(false);
+
+    // 卡片里不再有「目标 + 列表字段」两列结构
+    expect(wrapper.find(".ext__resp-target").exists()).toBe(false);
 
     // 说明改为问号图标（HelpTip 组件），鼠标指向时展示
     const help = wrapper.find(".wbd-tip__trigger");
@@ -533,16 +539,7 @@ describe("设计器：输入框的多条数据以候选下拉展示", () => {
     await tick();
   }
 
-  it("输入框目标显示候选开关，默认关闭", async () => {
-    const { wrapper } = await openDialog();
-    await addResponse(wrapper);
-
-    const sw = wrapper.find(".ext__cand input");
-    expect(sw.exists()).toBe(true);
-    expect((sw.element as HTMLInputElement).checked).toBe(false);
-  });
-
-  it("勾选后保存：生成「值 + 候选」两条映射，节点 options 自动绑定候选路径", async () => {
+  it("输入框目标保存：只生成候选映射，不回填输入框自身值", async () => {
     const { wrapper, store } = await openDialog();
     await wrapper.find('input[placeholder="/api/dept/list"]').setValue("/api/rows");
     await addResponse(wrapper);
@@ -552,20 +549,14 @@ describe("设计器：输入框的多条数据以候选下拉展示", () => {
       .find((item) => (item.attributes("placeholder") ?? "").includes("{{data.name}}"));
     expect(display).toBeTruthy();
     await display!.setValue("{{name}}");
-    await wrapper.find(".ext__cand input").setValue(true);
     await wrapper.find(".ext__ok").trigger("click");
     await tick();
 
     const node = store.page.children[0];
     const source = store.page.externalSources?.[node.externalRef ?? ""];
-    expect(source?.responses).toHaveLength(2);
-    // 值映射：写进输入框自身的绑定路径，只取第一条
+    // 输入框恒为候选：只生成一条 options.i1，不写 form.i1（否则第一条会顶掉用户输入）
+    expect(source?.responses).toHaveLength(1);
     expect(source?.responses?.[0]).toMatchObject({
-      scopePath: "form.i1",
-      display: "{{name}}",
-    });
-    // 候选映射：逐项渲染成选项数组
-    expect(source?.responses?.[1]).toMatchObject({
       scopePath: "options.i1",
       shape: "select",
       display: "{{name}}",
@@ -573,31 +564,25 @@ describe("设计器：输入框的多条数据以候选下拉展示", () => {
     expect(node.props?.options).toBe("{{options.i1}}");
   });
 
-  it("再次打开时候选映射回落成开关；取消勾选后清理绑定", async () => {
-    const { wrapper, store } = await openDialog();
+  it("再次打开：候选映射回落成输入框的那一张卡片，显示内容保留", async () => {
+    const { wrapper } = await openDialog();
     await wrapper.find('input[placeholder="/api/dept/list"]').setValue("/api/rows");
     await addResponse(wrapper);
     const display = wrapper
       .findAll(".ext__resp input")
       .find((item) => (item.attributes("placeholder") ?? "").includes("{{data.name}}"));
     await display!.setValue("{{name}}");
-    await wrapper.find(".ext__cand input").setValue(true);
     await wrapper.find(".ext__ok").trigger("click");
     await tick();
 
-    // 重新打开：两条映射应回落成一张卡片上的开关
+    // 重新打开：options.i1 映射不单独占卡片，回落成一张指向输入框的卡片
     await wrapper.find(".props__ext").trigger("click");
     await tick();
     expect(wrapper.findAll(".ext__resp")).toHaveLength(1);
-    expect((wrapper.find(".ext__cand input").element as HTMLInputElement).checked).toBe(true);
-
-    await wrapper.find(".ext__cand input").setValue(false);
-    await wrapper.find(".ext__ok").trigger("click");
-    await tick();
-
-    const node = store.page.children[0];
-    const source = store.page.externalSources?.[node.externalRef ?? ""];
-    expect(source?.responses).toHaveLength(1);
-    expect(node.props?.options).toBe("");
+    expect(wrapper.find(".ext__cand").exists()).toBe(false);
+    const again = wrapper
+      .findAll(".ext__resp input")
+      .find((item) => (item.attributes("placeholder") ?? "").includes("{{data.name}}"));
+    expect((again!.element as HTMLInputElement).value).toBe("{{name}}");
   });
 });

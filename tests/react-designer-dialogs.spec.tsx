@@ -539,7 +539,7 @@ describe("React 设计器：问号提示浮层", () => {
 });
 
 describe("React 设计器：输入框的多条数据以候选下拉展示", () => {
-  it("勾选候选开关后保存：生成「值 + 候选」两条映射，options 自动绑定", async () => {
+  it("输入框目标保存：只生成候选映射，不回填输入框自身值", async () => {
     const ui = setup(pageWith([{ id: "i1", component: "input", props: { label: "姓名" } }]));
     try {
       await ui.render();
@@ -558,17 +558,13 @@ describe("React 设计器：输入框的多条数据以候选下拉展示", () =
       expect(display).toBeTruthy();
       await typeInto(display!, "{{name}}");
 
-      const sw = ui.container.querySelector<HTMLInputElement>(".ext__cand input");
-      expect(sw).toBeTruthy();
-      await click(sw);
-
       await click(ui.container.querySelector(".ext__ok"));
 
       const node = ui.nodeOf("i1");
       const source = ui.schema().externalSources?.[node!.externalRef!];
-      expect(source?.responses).toHaveLength(2);
-      expect(source?.responses?.[0]).toMatchObject({ scopePath: "form.i1", display: "{{name}}" });
-      expect(source?.responses?.[1]).toMatchObject({
+      // 候选模式只生成 options.i1 一条映射，不再写 form.i1（否则第一条会顶掉用户输入）
+      expect(source?.responses).toHaveLength(1);
+      expect(source?.responses?.[0]).toMatchObject({
         scopePath: "options.i1",
         shape: "select",
         display: "{{name}}",

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import type { Component } from "vue";
+import { useUiAdapter } from "../renderer/context";
 import UiControl from "./ui/UiControl.vue";
 import { useDesignerStore } from "./store";
 import { useNotify } from "./ui/kit";
@@ -20,6 +22,18 @@ import { useMaterialCatalog } from "../materials/catalog";
 import { toHtml } from "@x-ac/web-design-core";
 import type { DeviceType, PageSchema } from "@x-ac/web-design-core";
 import type { PageRepository } from "../persistence/repo";
+
+/**
+ * 适配包的 Provider（主题 / 语言 / 弹层容器 / z-index 基准）由引擎自动桥接：
+ * 宿主不必手动套 xxxConfigProvider。未配置时用透传组件，不产生额外 DOM。
+ */
+const ProviderPassthrough = defineComponent({
+  name: "ProviderPassthrough",
+  setup(_props, { slots }) {
+    return () => slots.default?.();
+  },
+});
+const providerComponent = (useUiAdapter()?.provider as Component | undefined) ?? ProviderPassthrough;
 
 /**
  * 设计器标签（<SchemaDesigner page-id="..." @saved="..." />）。
@@ -262,6 +276,7 @@ function backToList(): void {
 </script>
 
 <template>
+  <component :is="providerComponent">
   <div v-if="ready" class="designer">
     <header class="topbar">
       <button class="icon-btn" title="返回页面列表" @click="backToList">←</button>
@@ -304,6 +319,7 @@ function backToList(): void {
     <ConditionBuilder />
     <CalculationDialog />
   </div>
+  </component>
 </template>
 
 <style scoped>

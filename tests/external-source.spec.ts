@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  applyExternalFill,
   collectExternalSources,
   createRequest,
   defaultScopePath,
@@ -522,7 +523,7 @@ describe("输入框目标：多条响应收敛成单值（候选下拉配套）"
     expect((scope.form as Record<string, unknown>).i1).toBe("张三");
   });
 
-  it("值映射与候选映射共用一次请求：前者出单值，后者出全部选项", async () => {
+  it("有候选映射时值映射不默认写第一条，选中后才回填", async () => {
     let calls = 0;
     setDefaultRequest(
       createRequest({
@@ -535,28 +536,30 @@ describe("输入框目标：多条响应收敛成单值（候选下拉配套）"
       }),
     );
     const scope: Record<string, unknown> = {};
-    await loadExternalSource(
-      source({
-        responses: [
-          { scopePath: "form.i1", shape: "form", listField: "rows", display: "{{name}}" },
-          {
-            scopePath: "options.i1",
-            shape: "select",
-            listField: "rows",
-            labelField: "name",
-            valueField: "id",
-            display: "{{data.name}}",
-          },
-        ],
-      }),
-      scope,
-    );
+    const src = source({
+      listField: "rows",
+      responses: [
+        { scopePath: "form.i1", shape: "form", display: "{{name}}" },
+        {
+          scopePath: "options.i1",
+          shape: "select",
+          labelField: "name",
+          valueField: "id",
+          display: "{{data.name}}",
+        },
+      ],
+    });
+    await loadExternalSource(src, scope);
     expect(calls).toBe(1);
-    expect((scope.form as Record<string, unknown>).i1).toBe("张三");
     expect((scope.options as Record<string, unknown>).i1).toEqual([
       { label: "张三", value: "1" },
       { label: "李四", value: "2" },
     ]);
+    // 未选中时值映射不写，避免「默认第一条」
+    expect((scope.form as Record<string, unknown> | undefined)?.i1).toBeUndefined();
+    // 选中「张三」→ 按该行记录回填
+    applyExternalFill(scope, src.id, "张三");
+    expect((scope.form as Record<string, unknown>).i1).toBe("张三");
   });
 });
 
@@ -599,7 +602,7 @@ describe("输入框目标：多条响应收敛成单值（候选下拉配套）"
     expect((scope.form as Record<string, unknown>).i1).toBe("张三");
   });
 
-  it("值映射与候选映射共用一次请求：前者出单值，后者出全部选项", async () => {
+  it("有候选映射时值映射不默认写第一条，选中后才回填", async () => {
     let calls = 0;
     setDefaultRequest(
       createRequest({
@@ -612,27 +615,29 @@ describe("输入框目标：多条响应收敛成单值（候选下拉配套）"
       }),
     );
     const scope: Record<string, unknown> = {};
-    await loadExternalSource(
-      source({
-        responses: [
-          { scopePath: "form.i1", shape: "form", listField: "rows", display: "{{name}}" },
-          {
-            scopePath: "options.i1",
-            shape: "select",
-            listField: "rows",
-            labelField: "name",
-            valueField: "id",
-            display: "{{data.name}}",
-          },
-        ],
-      }),
-      scope,
-    );
+    const src = source({
+      listField: "rows",
+      responses: [
+        { scopePath: "form.i1", shape: "form", display: "{{name}}" },
+        {
+          scopePath: "options.i1",
+          shape: "select",
+          labelField: "name",
+          valueField: "id",
+          display: "{{data.name}}",
+        },
+      ],
+    });
+    await loadExternalSource(src, scope);
     expect(calls).toBe(1);
-    expect((scope.form as Record<string, unknown>).i1).toBe("张三");
     expect((scope.options as Record<string, unknown>).i1).toEqual([
       { label: "张三", value: "1" },
       { label: "李四", value: "2" },
     ]);
+    // 未选中时值映射不写，避免「默认第一条」
+    expect((scope.form as Record<string, unknown> | undefined)?.i1).toBeUndefined();
+    // 选中「张三」→ 按该行记录回填
+    applyExternalFill(scope, src.id, "张三");
+    expect((scope.form as Record<string, unknown>).i1).toBe("张三");
   });
 });

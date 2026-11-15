@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { PageSchema } from "@x-ac/web-design-core";
 import {
   applyCalculations,
+  applyExternalFill,
   collectBindableElements,
   collectExternalSources,
   deepClone,
@@ -94,16 +95,36 @@ export function usePageStore(page: PageSchema, seed?: Record<string, unknown>): 
       const raw = getByPath(scopeRef.current, path);
       const threshold = Number(source.triggerLength ?? 0);
       const text = raw === null || raw === undefined ? "" : String(raw);
-      if (text.length < threshold) continue;
       const key = `${source.url}|${path}|${threshold}`;
+      if (text.length < threshold) {
+        // 低于阈值（如清空）：清掉判重记录，否则重新输入同一关键词会因判重而不请求
+        lastTriggered.current.delete(key);
+        continue;
+      }
       if (lastTriggered.current.get(key) === text) continue;
       lastTriggered.current.set(key, text);
       void loadExternalSource(source, scopeRef.current, {
         signal: controllerRef.current?.signal,
+        ownerPath: path,
         onError: (message) => {
           if (message) setDataError(message);
         },
       }).then(() => force());
+    }
+  }, [version]);
+
+  /**
+   * 选中回填：外部数据源把「列表里的一条记录」映射到多个目标时，
+   * 候选持有者的值一变（选中 / 清空），就把该记录的其它字段写进目标。
+   * 单条候选已在加载时直接回填，这里再跑一次是幂等的。
+   */
+  useEffect(() => {
+    const page = pageRef.current;
+    const elementPaths = new Map(collectBindableElements(page).map((item) => [item.nodeId, item.path]));
+    for (const { node, source } of collectExternalSources(page)) {
+      const path = node ? elementPaths.get(node.id) ?? "" : "";
+      if (!path) continue;
+      applyExternalFill(scopeRef.current, source.id, getByPath(scopeRef.current, path));
     }
   }, [version]);
 

@@ -25,6 +25,7 @@ import type { NodeSchema, PageSchema } from "../schema/types";
 import type { BindingContext, DataBinding, DataShape } from "./types";
 import { getProvider } from "./registry";
 import { normalize, toOption } from "./normalize";
+import { collectBindableElements } from "./bindable";
 
 /* ----------------------------- 配置契约 ----------------------------- */
 
@@ -101,6 +102,14 @@ export interface ExternalDataSource {
   headers?: Record<string, string>;
   /** 请求参数映射：值来自页面上选中的元素 */
   params?: ExternalParamMap[];
+  /**
+   * 响应数据里数组所在的字段名（如 `data.list`）。
+   *
+   * 顶层统一配置：一次响应通常只有一个数组，各响应映射都基于这个数组逐项生成，
+   * 映射里的 labelField / valueField / display 只描述「数组里的一项怎么映射」。
+   * `responses[].listField` 仍保留用于兼容旧 Schema；两者同时存在时以映射级为准。
+   */
+  listField?: string;
   /**
    * 响应数据映射（可多条，#4）。
    * 每条各自写不同的 scope 路径，形态 / label / value 独立，
@@ -213,14 +222,17 @@ function normalizeResponse(
   response: ExternalResponseMap,
   fallbackValueToLabel: boolean,
   scope: Scope,
+  sourceListField?: string,
 ): unknown {
   const labelField = response.labelField ?? "label";
   const valueField = response.valueField || (fallbackValueToLabel ? labelField : "value");
+  // 映射级优先，其次回退到数据源级（列表字段已上提到顶层统一配置）
+  const listField = response.listField ?? sourceListField;
   const binding: DataBinding = {
     type: "http",
     url: "",
     shape: response.shape ?? "form",
-    listField: response.listField,
+    listField,
     labelField,
     valueField,
   };
@@ -230,8 +242,8 @@ function normalizeResponse(
   // 子映射（响应目标为子表单时，#4）：逐行把响应数组映射成明细对象
   if (response.subMaps?.length) {
     let rows: unknown = raw;
-    if (response.listField && raw && typeof raw === "object") {
-      const extracted = getByPath(raw as Record<string, unknown>, response.listField);
+    if (listField && raw && typeof raw === "object") {
+      const extracted = getByPath(raw as Record<string, unknown>, listField);
       if (Array.isArray(extracted)) rows = extracted;
     }
     if (!Array.isArray(rows)) rows = [];
@@ -264,17 +276,24 @@ function normalizeResponse(
     return renderDisplay(template, target, scope);
   }
 
-  // 选项形态：逐项渲染，值仍按 label/value 字段映射
+  // 选项形态：逐项渲染，值仍按 label/value 字段映射。
+  // 响应不一定是数组：单条对象（如「个人档案」）也要成为一条候选项，
+  // 否则「列表字段不填 / 填了不存在的字段」都会得到空候选，用户以为设置没生效。
   let list: unknown = raw;
   if (binding.listField && raw && typeof raw === "object") {
     const extracted = getByPath(raw as Record<string, unknown>, binding.listField);
-    if (Array.isArray(extracted)) list = extracted;
+    if (extracted !== undefined) list = extracted;
   }
-  if (!Array.isArray(list)) list = [];
+  if (!Array.isArray(list)) {
+    list = list === undefined || list === null ? [] : [list];
+  }
 
   return (list as unknown[]).map((item) => {
     const option = toOption(item, binding);
-    return { ...option, label: renderDisplay(template, item, scope) };
+    const label = renderDisplay(template, item, scope);
+    // 响应里没有可用的值字段时回退到展示文本：否则 value 为空会在 parseOptions 里被过滤掉，
+    // 表现就是「配了候选却一个选项都没有」。
+    return { ...option, label, value: option.value || label };
   });
 }
 
@@ -300,18 +319,75 @@ export interface LoadExternalOptions {
   /** provider 名；缺省 default */
   provider?: string;
   signal?: AbortSignal;
+  /**
+   * 候选持有者的绑定路径（如 form.x_emp）。
+   * 用于「只有一条候选」时自动选中并写回源输入框，等价于直接回填。
+   */
+  ownerPath?: string;
   onError?: (message: string, source: ExternalDataSource) => void;
+}
+
+/** 一行候选：label 用来匹配「源输入框」的值，writes 是选中后要写入的其它目标 */
+interface FillRow {
+  label: string;
+  writes: Array<{ path: string; value: unknown }>;
+}
+
+/** scope → sourceId → 回填表。用 WeakMap 存，既不进 scope 也不影响数据导出 */
+const fillTables = new WeakMap<object, Map<string, FillRow[]>>();
+
+/** 取响应里的数组：顶层 listField 优先；非数组（单对象）包成一条 */
+function extractRows(raw: unknown, listField?: string): unknown[] {
+  let list: unknown = raw;
+  if (listField && raw && typeof raw === "object") {
+    const extracted = getByPath(raw as Record<string, unknown>, listField);
+    if (extracted !== undefined) list = extracted;
+  }
+  if (Array.isArray(list)) return list;
+  return list === undefined || list === null ? [] : [list];
+}
+
+/** 从一行记录里取出某个映射要写的值（有 display 走模板，否则按 value/label 字段） */
+function rowValue(row: unknown, response: ExternalResponseMap, scope: Scope): unknown {
+  const template = response.display?.trim();
+  if (template) return renderDisplay(template, row, scope);
+  const record = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
+  const field = response.valueField || response.labelField || "value";
+  const hit = getByPath(record, field);
+  return hit === undefined ? row : hit;
+}
+
+/**
+ * 把「选中值」对应那一行的其它映射写进 scope。
+ *
+ * 由渲染层的 watcher 在「候选持有者的值」变化时调用：用户在下拉里选中一条，
+ * 就把这条记录里其它字段回填到配置的目标元素（例如选中员工 → 回填个人档案）。
+ * 值被清空时一并清掉回填目标，避免留下上一次的脏数据。
+ */
+export function applyExternalFill(scope: Scope, sourceId: string, value: unknown): void {
+  const table = fillTables.get(scope)?.get(sourceId);
+  if (!table?.length) return;
+  const text = value === null || value === undefined ? "" : String(value);
+  const row = table.find((item) => item.label === text);
+  if (!row) {
+    if (!text) for (const write of table[0]!.writes) setByPath(scope, write.path, undefined);
+    return;
+  }
+  for (const write of row.writes) setByPath(scope, write.path, write.value);
 }
 
 /**
  * 加载单个外部数据源。
  *
- * 流程：先取一次原始响应（走参数 {{}} 绑定 + 页面级缓存），再按 `responses` 里每条响应
- * 各自的 shape / labelField / valueField / listField 归一化，分别写进各自的 scopePath。
- * 取数失败不抛错：保留原值，只通过 onError 上报，页面不会白屏。
+ * 取一次原始响应（走参数 {{}} 绑定 + 页面级缓存），再按 `responses` 归一化写入。
  *
- * 若未配置任何响应映射（#2：不需要绑定元素），仍会发起请求（例如仅用于「触发 / 写副作用」），
- * 但不向 scope 写任何数据。
+ * 两种形态：
+ * - **有候选源**（映射里存在 `options.<节点ID>` 的 select 映射）：把列表字段里的数组
+ *   逐项变成候选项写进 `options.<节点ID>`，其余映射按「行 → 目标」预计算成回填表，
+ *   等用户选中某条时再由 `applyExternalFill` 写入（单条候选则直接回填）；
+ * - **没有候选源**：各映射直接按旧行为写各自的 scopePath。
+ *
+ * 取数失败不抛错：保留原值，只通过 onError 上报，页面不会白屏。
  */
 export async function loadExternalSource(
   source: ExternalDataSource,
@@ -326,11 +402,53 @@ export async function loadExternalSource(
   try {
     const provider = getProvider(options.provider ?? "default");
     const raw = await provider.load(binding, ctx);
+    const responses = responsesOf(source);
 
-    for (const response of responsesOf(source)) {
-      const mapped = normalizeResponse(raw, response, Boolean(source.asOptions), scope);
-      setByPath(scope, response.scopePath, mapped);
+    // 候选源：写到 options.<节点ID> 的 select 映射（输入框的候选下拉）
+    const candidate = responses.find(
+      (item) => (item.shape ?? "form") === "select" && /^options\.[^.]+$/.test(item.scopePath),
+    );
+
+    if (!candidate) {
+      for (const response of responses) {
+        const mapped = normalizeResponse(raw, response, Boolean(source.asOptions), scope, source.listField);
+        setByPath(scope, response.scopePath, mapped);
+      }
+      options.onError?.("", source);
+      return raw;
     }
+
+    // 有候选：生成候选项 + 回填表；选中某条时再由 watcher 写其它目标
+    const rows = extractRows(raw, source.listField);
+    const labelField = candidate.labelField ?? "label";
+    const valueField = candidate.valueField || "value";
+    const items = rows.map((row) => {
+      const record = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
+      const label = candidate.display?.trim()
+        ? renderDisplay(candidate.display, row, scope)
+        : String(getByPath(record, labelField) ?? "");
+      const value = String(getByPath(record, valueField) ?? "") || label;
+      return { label, value };
+    });
+    setByPath(scope, candidate.scopePath, items);
+
+    const fills = responses.filter((item) => item !== candidate);
+    const table: FillRow[] = rows.map((row, index) => ({
+      label: items[index]?.label ?? "",
+      writes: fills.map((fill) => ({ path: fill.scopePath, value: rowValue(row, fill, scope) })),
+    }));
+    if (!fillTables.has(scope)) fillTables.set(scope, new Map());
+    fillTables.get(scope)!.set(source.id, table);
+
+    // 只有一条候选 = 等价于「直接回填」：自动写其它目标，并在源输入框为空时选中它
+    if (table.length === 1) {
+      for (const write of table[0]!.writes) setByPath(scope, write.path, write.value);
+      const only = items[0];
+      if (options.ownerPath && only && !getByPath(scope, options.ownerPath)) {
+        setByPath(scope, options.ownerPath, only.label);
+      }
+    }
+
     options.onError?.("", source);
     return raw;
   } catch (error) {
@@ -394,10 +512,14 @@ export async function loadExternalSources(
   const list = collectExternalSources(page);
   if (!list.length) return;
 
-  for (const { source } of list) {
+  const elementPaths = new Map(collectBindableElements(page).map((item) => [item.nodeId, item.path]));
+  for (const { node, source } of list) {
     // 触发型数据源（triggerLength > 0）不在这里加载：等用户输入够长度再触发
     if (Number(source.triggerLength ?? 0) > 0) continue;
-    await loadExternalSource(source, scope, options);
+    await loadExternalSource(source, scope, {
+      ...options,
+      ownerPath: node ? elementPaths.get(node.id) : undefined,
+    });
   }
 }
 

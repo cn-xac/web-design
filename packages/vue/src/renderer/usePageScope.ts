@@ -2,6 +2,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch, type Ref } 
 import type { PageSchema } from "@x-ac/web-design-core";
 import {
   applyCalculations,
+  applyExternalFill,
   collectBindableElements,
   collectExternalSources,
   deepClone,
@@ -109,17 +110,41 @@ export function usePageScope(
         const raw = values[index];
         const threshold = Number(source.triggerLength ?? 0);
         const text = raw === null || raw === undefined ? "" : String(raw);
-        if (text.length < threshold) return;
         const key = `${source.url}|${path}|${threshold}`;
+        if (text.length < threshold) {
+          // 低于阈值（如清空）：清掉判重记录，否则重新输入同一关键词会因判重而不请求
+          lastTriggered.delete(key);
+          return;
+        }
         if (lastTriggered.get(key) === text) return;
         lastTriggered.set(key, text);
         void loadExternalSource(source, scope, {
           signal: controller?.signal,
+          ownerPath: path,
           onError: (message) => {
             if (message) dataError.value = message;
           },
         });
       });
+    },
+    { deep: true },
+  );
+
+  /**
+   * 选中回填：外部数据源把「列表里的一条记录」映射到多个目标时，
+   * 候选持有者的值一变（用户选中某条 / 清空），就把该记录的其它字段写进目标。
+   * 单条候选已在加载时直接回填，这里再跑一次也是幂等的。
+   */
+  const fillEntries = computed(() =>
+    externalList.value
+      .map(({ node, source }) => ({ source, path: node ? elementPaths.value.get(node.id) ?? "" : "" }))
+      .filter((item) => item.path),
+  );
+
+  watch(
+    () => fillEntries.value.map((item) => getByPath(scope, item.path)),
+    (values) => {
+      fillEntries.value.forEach((item, index) => applyExternalFill(scope, item.source.id, values[index]));
     },
     { deep: true },
   );

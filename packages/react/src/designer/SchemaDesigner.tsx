@@ -9,6 +9,7 @@
  * React 的订阅（useSyncExternalStore）、快捷键、文件导入导出与布局。
  */
 import {
+  createElement,
   forwardRef,
   useCallback,
   useEffect,
@@ -17,6 +18,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ElementType,
 } from "react";
 import type { ChangeEvent } from "react";
 import {
@@ -276,7 +278,10 @@ export const SchemaDesigner = forwardRef<SchemaDesignerHandle, SchemaDesignerPro
 
   if (!ready) return null;
 
-  return (
+  // 适配包的 Provider（主题 / 语言 / 弹层容器 / z-index 基准）由引擎统一包裹；
+  // 未配置时直接渲染子树，不产生额外 DOM —— 宿主不必再手动套 xxxConfigProvider。
+  const provider = adapter?.provider as ElementType | undefined;
+  const inner = (
     <DesignerContext.Provider value={context}>
       {/* 弹窗会话挂在设计器实例上：状态随实例创建 / 销毁，多实例互不污染 */}
       <DesignerDialogsProvider>
@@ -358,4 +363,6 @@ export const SchemaDesigner = forwardRef<SchemaDesignerHandle, SchemaDesignerPro
       </DesignerDialogsProvider>
     </DesignerContext.Provider>
   );
+
+  return provider ? createElement(provider, null, inner) : inner;
 });

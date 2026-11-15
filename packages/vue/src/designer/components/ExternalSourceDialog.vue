@@ -13,8 +13,8 @@
  * 触发元素固定为「打开弹窗时点击的那个元素」，弹窗不再提供触发元素选择。
  *
  * 选项类目标会在保存时把它的 options 绑到结果路径（取数与 label/value 映射都归本弹窗管）；
- * 输入框目标可开启「多条数据以下拉候选展示」：额外生成一条 select 映射写到 options.<节点ID>，
- * 值仍由原 form 映射写进元素自身的绑定路径。
+ * 输入框目标恒为「搜索候选」：只生成一条 select 映射写到 options.<节点ID>，不回填元素自身的值 ——
+ * 数据由用户在下拉里自行选择，输入过程不会被第一条自动改写（单条响应也会成为一条候选）。
  */
 import { computed, reactive, ref, watch } from "vue";
 import type { DataShape, ExternalDataSource, ExternalResponseMap, ExternalSubMap } from "@x-ac/web-design-core";
@@ -61,7 +61,6 @@ interface DraftResponse {
   targetNodeId: string;
   /** 写入 scope 的路径，可手改 */
   scopePath: string;
-  listField: string;
   labelField: string;
   valueField: string;
   /** 显示内容模板：用 {{}} 从响应数据取数并自由拼接（#3） */
@@ -70,8 +69,6 @@ interface DraftResponse {
   parentField: string;
   /** 子映射（响应目标为子表单时）：响应行内各字段 → 子表单字段 */
   subMaps: ExternalSubMap[];
-  /** 输入框目标：多条数据额外生成候选下拉（值映射仍只取第一条） */
-  useCandidates: boolean;
   /** 当前推断形态：选项类目标 → select，否则 form */
   shape: DataShape;
 }
@@ -83,6 +80,8 @@ const draft = reactive({
   headers: {} as Record<string, string>,
   once: true,
   triggerLength: 0,
+  // 列表字段：数据源级统一配置（一次响应只有一个数组，各映射都基于它逐项生成）
+  listField: "",
   params: [] as DraftParam[],
   responses: [] as DraftResponse[],
 });
@@ -188,9 +187,9 @@ function tipOf(resp: DraftResponse): string {
       "「显示内容」支持用 {{}} 从响应数据取数并自由拼接（如 {{data.a}}/{{data.b}}）；下拉逐项渲染，输入框把整段响应渲染成字符串。",
     );
   }
-  if (isInputTarget(resp) && resp.useCandidates) {
+  if (isInputTarget(resp)) {
     parts.push(
-      "已开启候选下拉：同一份响应额外生成 options.<节点ID> 的候选项，点选一条即回填显示内容；值映射仍只取第一条。",
+      "输入框的外部数据源恒为「搜索候选」：响应写成 options.<节点ID> 的候选项，由用户自行点选一条；每条候选的展示文本由「显示内容」模板生成，单条响应也会作为一条候选。",
     );
   }
   if (!resp.targetNodeId) {
@@ -218,12 +217,13 @@ function defaultScopePath(): string {
 function reset(): void {
   const source = currentSource();
   const saved = responsesOf(source);
-  // 候选下拉生成的 options.<id> 映射不单独占一张卡片，回落成对应 form 映射上的开关
-  const candidateIds = new Set(
-    saved
-      .filter((r) => r.shape === "select" && /^options\.(.+)$/.test(r.scopePath))
-      .map((r) => /^options\.(.+)$/.exec(r.scopePath)![1]!),
-  );
+  // 输入框候选生成的 options.<id> 映射不单独占一张卡片，回落成输入框目标那一张。
+  // 候选模式不生成 form.<id> 值映射，因此可能需据此重建整张卡片（见下方补建）。
+  const candidateMaps = new Map<string, ExternalResponseMap>();
+  for (const r of saved) {
+    const match = /^options\.(.+)$/.exec(r.scopePath);
+    if (r.shape === "select" && match) candidateMaps.set(match[1]!, r);
+  }
   currentSourceId.value = source?.id ?? genSourceId();
   Object.assign(draft, {
     name: source?.name ?? "",
@@ -232,22 +232,22 @@ function reset(): void {
     headers: { ...(source?.headers ?? {}) },
     once: source?.once !== false,
     triggerLength: Number(source?.triggerLength ?? 0),
+    // 兼容旧数据：数据源级没写时，取第一条映射上的列表字段提升到顶层
+    listField: source?.listField ?? saved.find((r) => r.listField)?.listField ?? "",
     params: (source?.params ?? []).map((item) => ({ ...item })),
     responses: saved
       .filter((r) => {
         const match = /^options\.(.+)$/.exec(r.scopePath);
-        return !(r.shape === "select" && match && candidateIds.has(match[1]!));
+        return !(r.shape === "select" && match && candidateMaps.has(match[1]!));
       })
       .map((r) => ({
         targetNodeId: "",
         scopePath: r.scopePath,
-        listField: r.listField ?? "",
         labelField: r.labelField ?? "",
         valueField: r.valueField ?? "",
         display: r.display ?? "",
         parentField: r.parentField ?? "",
         subMaps: (r.subMaps ?? []).map((m) => ({ ...m })),
-        useCandidates: false,
         shape: r.shape ?? "form",
       })),
   });
@@ -257,13 +257,30 @@ function reset(): void {
     if (el) {
       resp.targetNodeId = el.nodeId;
       resp.shape = el.isOption ? "select" : "form";
-      if (candidateIds.has(el.nodeId)) resp.useCandidates = true;
       if (el.isOption) {
         resp.labelField = resp.labelField || "label";
         resp.valueField = resp.valueField || "value";
       }
       if (el.isGroup && !resp.parentField) resp.parentField = defaultParentField(el);
     }
+  }
+
+  // 输入框的候选映射只写了 options.<id>、没有对应卡片时，按候选项重建一张，
+  // 否则重新打开弹窗会丢掉该输入框的外部数据源配置。
+  for (const [id, cand] of candidateMaps) {
+    if (draft.responses.some((resp) => resp.targetNodeId === id)) continue;
+    const el = elements.value.find((e) => e.nodeId === id);
+    if (!el) continue;
+    draft.responses.push({
+      targetNodeId: id,
+      scopePath: el.path,
+      labelField: cand.labelField ?? "",
+      valueField: cand.valueField ?? "",
+      display: cand.display ?? "",
+      parentField: "",
+      subMaps: [],
+      shape: "select",
+    });
   }
 }
 
@@ -304,13 +321,11 @@ function addResponse(): void {
   const resp: DraftResponse = {
     targetNodeId: "",
     scopePath: defaultScopePath(),
-    listField: "",
     labelField: "",
     valueField: "",
     display: "",
     parentField: "",
     subMaps: [],
-    useCandidates: false,
     shape: "form",
   };
   // 只有一个「可输入 / 下拉」元素时默认选中目标，省去一次手动选择（#3）
@@ -344,8 +359,6 @@ function onResponseTarget(index: number, nodeId: string): void {
     // 目标是子表单 → 给父字段名默认值；换成别的目标则清掉子映射
     resp.parentField = el.isGroup ? defaultParentField(el) : "";
     if (!el.isGroup) resp.subMaps = [];
-    // 换成非输入框目标时关掉候选开关，避免生成无人消费的 options 映射
-    if (!isInputTarget(resp)) resp.useCandidates = false;
   }
 }
 
@@ -420,8 +433,27 @@ function buildSource(): ExternalDataSource {
     source.params = params.map((item) => ({ key: item.key.trim(), path: item.path, label: item.label }));
   }
 
+  // 列表字段：数据源级统一配置，各映射只描述「数组里的一项怎么映射」
+  const listField = draft.listField.trim();
+  if (listField) source.listField = listField;
+
   const responses: ExternalResponseMap[] = [];
+  // 只有「数据源拥有者」这个输入框才是候选源；其余映射是选中后回填的目标。
+  // 这样「员工搜索选一条 → 回填个人档案」这类联动才成立。
+  const ownerId = dialog.target.value?.nodeId ?? "";
   for (const r of draft.responses.filter((item) => item.scopePath.trim())) {
+    if (isInputTarget(r) && r.targetNodeId && r.targetNodeId === ownerId) {
+      const candidate: ExternalResponseMap = {
+        scopePath: `options.${ownerId}`,
+        shape: "select",
+        labelField: r.labelField.trim() || "label",
+        valueField: r.valueField.trim() || "value",
+      };
+      if (r.display.trim()) candidate.display = r.display.trim();
+      responses.push(candidate);
+      continue;
+    }
+
     const out: ExternalResponseMap = { scopePath: r.scopePath.trim() };
     const el = elementByNodeId(r.targetNodeId);
     if (el?.isOption) {
@@ -430,8 +462,6 @@ function buildSource(): ExternalDataSource {
       out.labelField = r.labelField.trim() || "label";
       out.valueField = r.valueField.trim();
     }
-    if (r.listField.trim()) out.listField = r.listField.trim();
-    // 显示内容模板：只对「可输入 / 下拉」目标有意义（#3）
     if (r.display.trim()) out.display = r.display.trim();
     // 父字段名 + 子映射：只对子表单目标有意义（#4）
     if (r.parentField.trim()) out.parentField = r.parentField.trim();
@@ -439,20 +469,6 @@ function buildSource(): ExternalDataSource {
       out.subMaps = r.subMaps.map((m) => ({ field: m.field, from: m.from }));
     }
     responses.push(out);
-
-    // 候选下拉：同一份响应再生成一条 select 映射，逐项渲染成 options.<节点ID>。
-    // 值映射（上面这条）仍只写第一条，输入框点选候选后回填显示文本。
-    if (r.useCandidates && isInputTarget(r)) {
-      const candidate: ExternalResponseMap = {
-        scopePath: `options.${r.targetNodeId}`,
-        shape: "select",
-        labelField: r.labelField.trim() || "label",
-        valueField: r.valueField.trim() || "value",
-      };
-      if (r.listField.trim()) candidate.listField = r.listField.trim();
-      if (r.display.trim()) candidate.display = r.display.trim();
-      responses.push(candidate);
-    }
   }
   if (responses.length) source.responses = responses;
 
@@ -470,9 +486,9 @@ function save(): void {
     notify("请填写请求地址", "error");
     return;
   }
-  // 候选项靠「显示内容」模板逐项生成展示文本，没模板就没有可点的文字
-  if (draft.responses.some((r) => r.useCandidates && isInputTarget(r) && !r.display.trim())) {
-    notify("开启候选下拉时请填写「显示内容」，候选项靠它生成展示文本", "error");
+  // 输入框候选靠「显示内容」模板逐项生成展示文本，没模板就没有可点的文字
+  if (draft.responses.some((r) => isInputTarget(r) && !r.display.trim())) {
+    notify("输入框的外部数据源需要填写「显示内容」，候选项靠它生成展示文本", "error");
     return;
   }
 
@@ -591,6 +607,17 @@ function remove(): void {
         响应数据映射
         <span class="ext__section-hint">可设多条，各自写不同路径；留空则不写数据（仅触发请求）</span>
       </div>
+      <!-- 列表字段：数据源级统一配置。选项与各条映射都基于这个数组逐项生成，
+           所以放在顶层，而不是每条映射里各填一遍。 -->
+      <div class="ext__row">
+        <label class="ext__label">列表字段</label>
+        <input
+          v-model="draft.listField"
+          class="ext__input wb-mono"
+          placeholder="响应里数组所在的字段，如 data.list；留空 = 响应本身是数组"
+          spellcheck="false"
+        />
+      </div>
       <div class="ext__params">
         <div v-for="(resp, index) in draft.responses" :key="index" class="ext__resp">
           <div class="ext__resp-head">
@@ -598,8 +625,8 @@ function remove(): void {
             <HelpTip :text="tipOf(resp)" />
             <button type="button" class="ext__del" title="删除映射" @click="removeResponse(index)">×</button>
           </div>
-          <!-- 目标元素 + 列表字段：两项各占一半宽度 -->
-          <div class="ext__resp-target">
+          <!-- 目标元素：候选项基于上面的「列表字段」逐项生成，这里只选写给谁 -->
+          <div class="ext__row">
             <UiControl
               as="Select"
               :model-value="resp.targetNodeId"
@@ -609,12 +636,6 @@ function remove(): void {
               size="small"
               placeholder="选择目标元素（可空）"
               @update:model-value="(v: string) => onResponseTarget(index, v)"
-            />
-            <input
-              v-model="resp.listField"
-              class="ext__input wb-mono"
-              placeholder="列表字段，如 data.list"
-              spellcheck="false"
             />
           </div>
           <div class="ext__row">
@@ -652,11 +673,6 @@ function remove(): void {
               spellcheck="false"
             />
           </div>
-          <!-- 输入框专属：接口返回多条时，额外生成候选下拉（值映射仍只取第一条） -->
-          <label v-if="isInputTarget(resp)" class="ext__switch ext__cand">
-            <input v-model="resp.useCandidates" type="checkbox" />
-            <span>多条数据以下拉候选展示（点选一条回填输入框）</span>
-          </label>
         </div>
         <button type="button" class="ext__ghost ext__ghost--block" @click="addResponse">+ 添加响应映射</button>
       </div>
