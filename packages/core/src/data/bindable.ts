@@ -416,6 +416,8 @@ export interface SpecialSettingFlags {
   rules: boolean;
   /** 事件动作 */
   events: boolean;
+  /** 高级计算（rtHicl） */
+  calculation: boolean;
 }
 
 export interface SpecialSettingItem {
@@ -423,7 +425,10 @@ export interface SpecialSettingItem {
   /** 展示名（物料标题 + 文本摘要） */
   label: string;
   component: string;
+  /** 元素标签：物料标题，列表里用来区分元素类型 */
   title: string;
+  /** 绑定路径：同名元素靠它区分，子表单内带 [0] 占位 */
+  path: string;
   flags: SpecialSettingFlags;
 }
 
@@ -436,7 +441,10 @@ function nodeSummary(node: NodeSchema, material: Material | undefined): string {
 
 /**
  * 收集页面里带「特殊设置」的节点，供组件树的「特殊设置」tab 直观展示
- * （哪些元素用了外部数据源 / 显隐条件 / 校验 / 事件）。
+ * （哪些元素用了外部数据源 / 显隐条件 / 校验 / 事件 / 高级计算）。
+ *
+ * 每行除了名称与配置标记，还给出 `title`（元素标签）与 `path`（绑定路径）：
+ * 页面上同名元素很多，只靠名称无法区分，这两个字段是列表的去歧义依据。
  */
 export function collectSpecialSettings(
   page: PageSchema,
@@ -445,28 +453,45 @@ export function collectSpecialSettings(
   const registry = options.registry ?? createRegistry(MATERIALS);
   const out: SpecialSettingItem[] = [];
 
-  const walk = (nodes: NodeSchema[]): void => {
+  const walk = (nodes: NodeSchema[], base: string): void => {
     for (const node of nodes ?? []) {
       const material = registry.get(node.component);
+      const textProp = material?.textProp;
+      // 与 collectCalculationTargets / 渲染器自动绑定同口径：显式绑定优先，否则落在当前前缀
+      const explicit =
+        extractPath(node.props?.modelValue) ??
+        (textProp ? extractPath(node.props?.[textProp]) : null);
+      const path = explicit ?? `${base}.${node.id}`;
       const flags: SpecialSettingFlags = {
         external: Boolean(node.externalRef),
         visibility: Boolean(node.visibility),
         rules: Boolean(node.rules?.length),
         events: Boolean(node.events && Object.keys(node.events).length),
+        calculation: Boolean(node.calculation),
       };
-      if (flags.external || flags.visibility || flags.rules || flags.events) {
+      if (
+        flags.external ||
+        flags.visibility ||
+        flags.rules ||
+        flags.events ||
+        flags.calculation
+      ) {
         out.push({
           nodeId: node.id,
           label: nodeSummary(node, material),
           component: node.component,
           title: material?.title ?? node.component,
+          path,
           flags,
         });
       }
-      walk(node.children ?? []);
+      const itemPath =
+        material?.kind === "subform" ? String(node.props?.itemPath ?? "items") : "";
+      const childBase = itemPath ? `${base}.${itemPath}[0]` : base;
+      walk(node.children ?? [], childBase);
     }
   };
 
-  walk(page.children ?? []);
+  walk(page.children ?? [], "form");
   return out;
 }
