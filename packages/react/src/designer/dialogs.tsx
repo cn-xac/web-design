@@ -17,6 +17,7 @@ import { ExternalSourceDialog } from "./components/ExternalSourceDialog";
 import { ExternalSubMapDialog } from "./components/ExternalSubMapDialog";
 import { HeadersDialog } from "./components/HeadersDialog";
 import { ConditionDialog } from "./components/ConditionDialog";
+import { CalculationDialog } from "./components/CalculationDialog";
 
 /* ---------------- 落点定义 ---------------- */
 
@@ -51,6 +52,12 @@ export interface ConditionTarget {
   kind: "show" | "hide";
 }
 
+/** 数据计算的落点：哪个文字 / 数字元素要自动回填结果 */
+export interface CalculationTarget {
+  nodeId: string;
+  label: string;
+}
+
 /** 子映射的落点：属于哪条响应映射、目标子表单是谁 */
 export interface SubMapTarget {
   /** 所属响应映射在草稿里的下标 */
@@ -80,6 +87,8 @@ export interface DesignerDialogsApi {
   closeExternal(): void;
   openConditions(target: ConditionTarget): void;
   closeConditions(): void;
+  openCalculation(target: CalculationTarget): void;
+  closeCalculation(): void;
   /** 打开子映射弹窗：resolve 出确认后的子映射，取消为 null（表示「没改」） */
   openSubMap(target: SubMapTarget): Promise<ExternalSubMap[] | null>;
   /** 打开请求头弹窗：resolve 出确认后的行，取消为 null（调用方须保留原值） */
@@ -99,6 +108,7 @@ export function DesignerDialogsProvider({ children }: { children: ReactNode }) {
   const [optionsTarget, setOptionsTarget] = useState<OptionsTarget | null>(null);
   const [externalTarget, setExternalTarget] = useState<ExternalTarget | null>(null);
   const [conditionTarget, setConditionTarget] = useState<ConditionTarget | null>(null);
+  const [calculationTarget, setCalculationTarget] = useState<CalculationTarget | null>(null);
   const [subMapTarget, setSubMapTarget] = useState<SubMapTarget | null>(null);
   const [headerRows, setHeaderRows] = useState<HeaderRow[] | null>(null);
 
@@ -109,6 +119,7 @@ export function DesignerDialogsProvider({ children }: { children: ReactNode }) {
   const closeOptions = useCallback(() => setOptionsTarget(null), []);
   const closeExternal = useCallback(() => setExternalTarget(null), []);
   const closeConditions = useCallback(() => setConditionTarget(null), []);
+  const closeCalculation = useCallback(() => setCalculationTarget(null), []);
 
   const openSubMap = useCallback(
     (target: SubMapTarget) =>
@@ -166,6 +177,8 @@ export function DesignerDialogsProvider({ children }: { children: ReactNode }) {
       closeExternal,
       openConditions: (target) => setConditionTarget(target),
       closeConditions,
+      openCalculation: (target) => setCalculationTarget(target),
+      closeCalculation,
       openSubMap,
       openHeaders,
     }),
@@ -180,6 +193,9 @@ export function DesignerDialogsProvider({ children }: { children: ReactNode }) {
       {optionsTarget ? <OptionsDialog target={optionsTarget} onClose={closeOptions} /> : null}
       {externalTarget ? <ExternalSourceDialog target={externalTarget} onClose={closeExternal} /> : null}
       {conditionTarget ? <ConditionDialog target={conditionTarget} onClose={closeConditions} /> : null}
+      {calculationTarget ? (
+        <CalculationDialog target={calculationTarget} onClose={closeCalculation} />
+      ) : null}
       {subMapTarget ? (
         <ExternalSubMapDialog target={subMapTarget} onCancel={cancelSubMap} onConfirm={confirmSubMap} />
       ) : null}

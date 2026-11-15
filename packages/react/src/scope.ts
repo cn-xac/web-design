@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { PageSchema } from "@x-ac/web-design-core";
 import {
+  applyCalculations,
   collectBindableElements,
   collectExternalSources,
   deepClone,
@@ -105,6 +106,16 @@ export function usePageStore(page: PageSchema, seed?: Record<string, unknown>): 
       }).then(() => force());
     }
   }, [version]);
+
+  /**
+   * 数据计算（rtHicl）：每次 scope 变化（version 自增）或页面配置变化后重算。
+   * 写回直接改 scopeRef，不经过 setValue，避免无谓的 force；只有真的写了值才刷新一次，
+   * 下一轮 effect 因值未变化立即收敛，不会形成循环。
+   */
+  useEffect(() => {
+    const results = applyCalculations(pageRef.current, scopeRef.current);
+    if (results.some((item) => item.changed)) force();
+  }, [version, page]);
 
   useEffect(() => {
     initial.current = deepClone(page.state ?? {});

@@ -1808,3 +1808,49 @@ select.wbd-input.wbd-sm {
 .cond__spacer { flex: 1; }
 .cond__clear { border: 1px solid var(--wb-line); border-radius: 5px; background: #fff; padding: 5px 12px; font-size: 12px; font-family: inherit; color: var(--wb-ink2); cursor: pointer; }
 .cond__add { margin-top: 8px; }
+
+/* ---------------- 数据计算弹窗（rtHicl） ---------------- */
+.style__cond-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.calc__hint { font-size: 12px; line-height: 1.8; color: var(--wb-ink2); }
+.calc__path { font-family: var(--wb-mono); color: var(--wb-primary); }
+.calc__section { margin: 14px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--wb-ink3); }
+.calc__rows { max-height: 200px; overflow: auto; border: 1px solid var(--wb-line-soft); border-radius: 8px; background: #fbfcfe; }
+.calc__row { display: flex; align-items: center; gap: 6px; padding: 7px 8px; border-bottom: 1px solid var(--wb-line-soft); flex-wrap: wrap; }
+.calc__no { width: 18px; flex: none; text-align: center; font-size: 12px; color: var(--wb-ink3); }
+.calc__select, .calc__alias, .calc__formula, .calc__small { border: 1px solid var(--wb-line); border-radius: 5px; background: #fff; padding: 5px 7px; font-size: 12px; font-family: inherit; color: var(--wb-ink); min-width: 0; }
+.calc__element { flex: 1 1 180px; }
+.calc__aggregate { flex: 0 0 80px; }
+.calc__operator { flex: 0 0 90px; }
+.calc__alias { flex: 0 0 88px; }
+.calc__placeholder { flex: 0 0 88px; color: var(--wb-ink3); }
+.calc__small { width: 78px; }
+.calc__formula { width: 100%; box-sizing: border-box; resize: vertical; line-height: 1.6; }
+.calc__del { flex: none; border: none; background: transparent; font-size: 16px; line-height: 1; color: var(--wb-ink3); cursor: pointer; }
+.calc__del:hover { color: var(--wb-danger); }
+.calc__empty { padding: 14px; text-align: center; font-size: 12px; color: var(--wb-ink3); }
+.calc__add, .calc__fn, .calc__mode { border: 1px solid var(--wb-line); border-radius: 5px; background: #fff; padding: 5px 10px; font-size: 12px; font-family: inherit; color: var(--wb-ink2); cursor: pointer; }
+.calc__add { margin-top: 8px; border-style: dashed; }
+.calc__tip { margin-top: 5px; font-size: 11.5px; color: var(--wb-ink3); }
+.calc__tip.is-error { color: var(--wb-danger); }
+.calc__fn-label { margin: 10px 0 6px; font-size: 11.5px; color: var(--wb-ink3); }
+.calc__fn-group { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; }
+.calc__fn-group-name { width: 72px; flex: none; font-size: 11px; color: var(--wb-ink3); }
+.calc__fn { padding: 3px 8px; font-family: var(--wb-mono); font-size: 11px; }
+.calc__fn:hover, .calc__mode:hover { border-color: var(--wb-primary); color: var(--wb-primary); }
+.calc__fn-help { margin-top: 8px; padding: 9px 11px; border: 1px solid var(--wb-line-soft); border-radius: 7px; background: var(--wb-bg); font-size: 11.5px; line-height: 1.8; color: var(--wb-ink2); }
+.calc__fn-help--empty { color: var(--wb-ink3); }
+.calc__fn-help-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 3px; }
+.calc__fn-help-head code { font-family: var(--wb-mono); font-size: 12px; color: var(--wb-primary); }
+.calc__fn-help-head span { color: var(--wb-ink3); }
+.calc__fn-help b { display: inline-block; width: 32px; color: var(--wb-ink3); font-weight: 600; }
+.calc__fn-help code { font-family: var(--wb-mono); }
+.calc__fn-help-desc { margin-top: 3px; color: var(--wb-ink3); }
+.calc__options { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.calc__option { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--wb-ink2); cursor: pointer; }
+.calc__modes { display: flex; gap: 6px; margin: 8px 0; }
+.calc__mode.is-active { border-color: var(--wb-primary); background: var(--wb-primary-soft); color: var(--wb-primary); }
+.calc__preview { margin-top: 12px; padding: 8px 10px; border-radius: 6px; background: var(--wb-bg); font-size: 12px; color: var(--wb-ink2); }
+.calc__clear, .calc__cancel, .calc__ok { border-radius: 5px; padding: 5px 12px; font-size: 12px; font-family: inherit; cursor: pointer; }
+.calc__clear, .calc__cancel { border: 1px solid var(--wb-line); background: #fff; color: var(--wb-ink2); }
+.calc__ok { border: 1px solid var(--wb-primary); background: var(--wb-primary); color: #fff; }
+.calc__spacer { flex: 1; }
