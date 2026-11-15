@@ -60,7 +60,8 @@ async function openConditionDialog(wrapper: Awaited<ReturnType<typeof mountWithN
   await styleTab!.trigger("click");
   await tick();
 
-  const buttons = wrapper.findAll(".style__cond-btn");
+  // 样式面板还有「数据计算」入口，条件按钮按专属选择器排除它
+  const buttons = wrapper.findAll(".style__cond-btn:not(.style__calc-btn)");
   expect(buttons).toHaveLength(2);
   await buttons[index].trigger("click");
   await tick();
@@ -138,7 +139,7 @@ describe("设计器：显示 / 隐藏条件弹窗", () => {
     await styleTab!.trigger("click");
     await tick();
 
-    expect(wrapper.findAll(".style__cond-btn")[0].text()).toContain("1 条 · 或者");
+    expect(wrapper.findAll(".style__cond-btn:not(.style__calc-btn)")[0].text()).toContain("1 条 · 或者");
   });
 });
 

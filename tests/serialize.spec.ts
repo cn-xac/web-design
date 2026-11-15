@@ -53,11 +53,12 @@ describe("版本迁移", () => {
     expect(schema.schemaVersion).toBe(SCHEMA_VERSION);
   });
 
-  it("1.0.0 迁移到 1.1.0 只推进版本，不改旧结构", () => {
+  it("1.0.0 链式迁移到当前版本只推进版本，不改旧结构", () => {
     const node = { id: "n1", component: "ec-input", directives: [{ name: "show", value: "list.length > 0" }] };
     const { schema, applied } = migratePage({ schemaVersion: "1.0.0", id: "p", type: "page", children: [node] });
-    expect(applied).toEqual(["1.0.0 -> 1.1.0"]);
-    expect(schema.schemaVersion).toBe("1.1.0");
+    expect(applied[0]).toBe("1.0.0 -> 1.1.0");
+    expect(applied.at(-1)).toContain(SCHEMA_VERSION);
+    expect(schema.schemaVersion).toBe(SCHEMA_VERSION);
     expect(schema.children[0].directives).toEqual(node.directives);
     expect("visibility" in schema.children[0]).toBe(false);
   });

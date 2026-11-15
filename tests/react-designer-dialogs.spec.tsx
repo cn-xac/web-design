@@ -449,7 +449,8 @@ describe("React 设计器：显示隐藏条件弹窗", () => {
       await ui.select("i1");
 
       await click(byText(ui.container, ".inspector__tab", "样式"));
-      const trigger = byText(ui.container, ".style__cond-btn", "未配置");
+      // 排除新增的「数据计算」入口，只取显示 / 隐藏条件按钮
+      const trigger = byText(ui.container, ".style__cond-btn:not(.style__calc-btn)", "未配置");
       expect(trigger).toBeTruthy();
       await click(trigger);
 
