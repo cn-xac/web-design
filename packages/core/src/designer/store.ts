@@ -13,6 +13,9 @@ import type { ActionSchema, DeviceType, NodeSchema, PageSchema } from "../schema
 import { createEmptyPage } from "../schema/types";
 import type { ExternalDataSource } from "../data/external";
 import type { VisibilityConfig } from "../visibility/types";
+import type { CalculationConfig } from "../calculation/types";
+import { collectCalculationTargets } from "../calculation/sources";
+import { extractPath } from "../schema/expression";
 import { normalizeRules, type ValidationRule } from "../validation/rules";
 import {
   cloneWithNewIds,
@@ -529,6 +532,38 @@ export class DesignerStore {
       if (!config) delete node.visibility;
       else node.visibility = clone(config);
     }, `visibility:${id}`);
+    this.emit();
+  }
+
+  /**
+   * 写入节点的数据计算配置（rtHicl）。传 undefined 表示移除。
+   *
+   * 文字类展示元素没有显式绑定时，顺带把正文属性绑到回填路径：
+   * 「计算结果填入当前元素」因此不需要渲染器开任何特例（textProp 本来就会 resolveValue）。
+   * 绑定与配置写进同一次 mutatePage，撤销 / 重做是一个原子操作。
+   */
+  setCalculation(config: CalculationConfig | undefined): void {
+    if (!this.selectedId) return;
+    const id = this.selectedId;
+    this.mutatePage((page) => {
+      const node = findLocation(page.children, id)?.node;
+      if (!node) return false;
+      if (!config) {
+        delete node.calculation;
+        return true;
+      }
+      node.calculation = clone(config);
+      const material = this.registry.get(node.component);
+      if (material?.textProp && !extractPath(node.props?.modelValue)) {
+        const target = collectCalculationTargets(page, { registry: this.registry }).find(
+          (item) => item.nodeId === id,
+        );
+        if (target) {
+          node.props = { ...(node.props ?? {}), [material.textProp]: `{{${target.path}}}` };
+        }
+      }
+      return true;
+    }, `calculation:${id}`);
     this.emit();
   }
 

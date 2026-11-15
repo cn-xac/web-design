@@ -6,6 +6,7 @@
 import type { ValidationRule } from "../validation/rules";
 import type { ExternalDataSource } from "../data/external";
 import type { VisibilityConfig } from "../visibility/types";
+import type { CalculationConfig } from "../calculation/types";
 
 export type DeviceType = "pc" | "pad" | "h5";
 
@@ -50,6 +51,11 @@ export interface NodeSchema {
    * 与 directives 并存：未配置时回落到旧指令，旧 Schema 行为不变。
    */
   visibility?: VisibilityConfig;
+  /**
+   * 数据计算配置（rtHicl）：按参与元素 + 算式自动求值并回填当前元素。
+   * 参与条件复用 ConditionGroup，子表单明细字段支持 sum / avg / min / max 聚合。
+   */
+  calculation?: CalculationConfig;
   children?: NodeSchema[];
 }
 
@@ -86,8 +92,8 @@ export interface PageSchema {
   children: NodeSchema[];
 }
 
-/** 1.1.0：新增节点级 visibility 配置（r5u4Ul / rfD7Jv），旧字段语义未变 */
-export const SCHEMA_VERSION = "1.1.0";
+/** 1.2.0：新增节点级 calculation 配置（rtHicl）；1.1.0 起支持 visibility，旧字段语义未变 */
+export const SCHEMA_VERSION = "1.2.0";
 
 export function createEmptyPage(title = "未命名页面"): PageSchema {
   return {

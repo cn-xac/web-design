@@ -13,6 +13,8 @@ import {
   CONDITION_OPERATOR_OPTIONS,
 } from "../visibility/types";
 import { validateAdvancedExpression } from "../visibility/evaluate";
+import { validateCalculationConfig } from "../calculation/evaluate";
+import { extractPath } from "./expression";
 
 export type IssueLevel = "error" | "warning";
 
@@ -201,6 +203,14 @@ export function validatePage(input: unknown, knownComponents?: Set<string>): Val
             }
           });
         }
+      }
+
+      if (node.calculation !== undefined) {
+        // 算式与参与元素都是纯数据，但要在保存时挡住非法语法、重复别名与自引用
+        const targetPath = extractPath(node.props?.modelValue) ?? undefined;
+        validateCalculationConfig(node.calculation, targetPath).forEach((message) =>
+          error(`${at}.calculation`, message),
+        );
       }
 
       if (node.events !== undefined) {

@@ -82,7 +82,8 @@ function expandSeries(value: unknown, path: string): unknown[] | null {
   return out;
 }
 
-function collectSeries(scope: Scope, path: string): unknown[] | null {
+/** 把带 `[0]` 占位的路径展开成全部行的取值序列；非明细路径返回 null。供数据计算复用 */
+export function collectSeries(scope: Scope, path: string): unknown[] | null {
   return expandSeries(scope, path);
 }
 

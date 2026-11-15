@@ -19,6 +19,9 @@ export * from "./schema/array";
 /** 元素显示 / 隐藏控制 + 通用多条件求值（r5u4Ul / rfD7Jv） */
 export * from "./visibility";
 
+/** 数据计算（rtHicl）：参与元素 + 聚合 + 高级函数白名单 + 自动回填 */
+export * from "./calculation";
+
 /** 统一请求层：拦截器 + 上传，供所有 URL 请求收口 */
 export * from "./request";
 

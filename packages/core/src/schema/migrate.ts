@@ -23,6 +23,12 @@ const MIGRATIONS: MigrationEntry[] = [
     to: "1.1.0",
     run: (schema) => schema,
   },
+  {
+    // 1.2.0 新增可选字段 node.calculation（数据计算 + 高级函数），旧 Schema 无需结构变换。
+    from: "1.1.0",
+    to: "1.2.0",
+    run: (schema) => schema,
+  },
 ];
 
 function compare(a: string, b: string): number {

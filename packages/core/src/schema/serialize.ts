@@ -29,6 +29,7 @@ export function compactNode(node: NodeSchema, dropDefaults = true): NodeSchema {
   if (node.directives?.length) output.directives = node.directives;
   if (node.externalRef) output.externalRef = node.externalRef;
   if (node.visibility && !isEmptyObject(node.visibility)) output.visibility = node.visibility;
+  if (node.calculation && !isEmptyObject(node.calculation)) output.calculation = node.calculation;
   if (node.events && !isEmptyObject(node.events)) output.events = node.events;
   if (node.rules?.length) output.rules = node.rules;
   if (node.children?.length) output.children = node.children.map((child) => compactNode(child, dropDefaults));

@@ -8,7 +8,12 @@
  *   - 运算：! && || == === != !== > >= < <= + - * / %
  *   - 三元：cond ? a : b
  *   - 括号
- * 明确不支持：函数调用、new、赋值、可选链、模板字符串、正则。
+ * 明确不支持：new、赋值、可选链、模板字符串、正则。
+ *
+ * 函数调用是受限能力：默认关闭（通用 `{{path}}` 绑定表达式仍不允许调用），
+ * 只有调用 `evaluateWithFunctions()` 并显式传入白名单函数表时才开放，
+ * 且函数名必须命中该白名单、实现来自内核静态表，无法从 scope 中取函数。
+ * 数据计算（rtHicl）的高级函数即走这条通道。
  */
 
 export type Scope = Record<string, unknown>;
@@ -27,7 +32,12 @@ type Ast =
   | { t: "member"; obj: Ast; key: Ast; computed: boolean }
   | { t: "unary"; op: string; arg: Ast }
   | { t: "binary"; op: string; l: Ast; r: Ast }
+  | { t: "call"; name: string; args: Ast[] }
   | { t: "cond"; test: Ast; cons: Ast; alt: Ast };
+
+/** 白名单函数：只接收已求值参数，不允许访问 scope，也不可能拿到构造器 */
+export type ExpressionFunction = (args: unknown[]) => unknown;
+export type ExpressionFunctionMap = Record<string, ExpressionFunction>;
 
 /** 访问这些键一律返回 undefined，防止原型链逃逸 */
 const FORBIDDEN_KEYS = new Set([
@@ -168,9 +178,12 @@ function tokenize(input: string): Token[] {
 class Parser {
   private tokens: Token[];
   private index = 0;
+  /** 允许调用的函数名（统一大写）；空集合 = 禁函数调用 */
+  private callNames: ReadonlySet<string>;
 
-  constructor(source: string) {
+  constructor(source: string, callNames?: ReadonlySet<string>) {
     this.tokens = tokenize(source);
+    this.callNames = callNames ?? new Set<string>();
   }
 
   private peek(): Token {
@@ -267,6 +280,21 @@ class Parser {
         node = { t: "member", obj: node, key, computed: true };
         continue;
       }
+      if (this.eat("(")) {
+        // 仅白名单内的标识符可以调用；scope 里的值永远不会被当作函数执行
+        if (node.t !== "id" || !this.callNames.has(node.name.toUpperCase())) {
+          throw new ExpressionError(`不支持函数调用 "${node.t === "id" ? node.name : "(...)"}"`);
+        }
+        const name = node.name.toUpperCase();
+        const args: Ast[] = [];
+        if (!this.eat(")")) {
+          args.push(this.parseTernary());
+          while (this.eat(",")) args.push(this.parseTernary());
+          this.expect(")");
+        }
+        node = { t: "call", name, args };
+        continue;
+      }
       return node;
     }
   }
@@ -296,17 +324,35 @@ class Parser {
 }
 
 const astCache = new Map<string, Ast | null>();
+/** 函数调用模式的 AST 单独缓存：同一串文本在两种模式下解析结果不同 */
+const formulaCache = new Map<string, Ast | null>();
 
-function parseCached(source: string): Ast | null {
-  if (astCache.has(source)) return astCache.get(source) ?? null;
+function functionNames(functions?: ExpressionFunctionMap): ReadonlySet<string> | undefined {
+  if (!functions) return undefined;
+  return new Set(Object.keys(functions).map((name) => name.toUpperCase()));
+}
+
+function parseCached(source: string, functions?: ExpressionFunctionMap): Ast | null {
+  const cache = functions ? formulaCache : astCache;
+  if (cache.has(source)) return cache.get(source) ?? null;
   try {
-    const ast = new Parser(source).parse();
-    astCache.set(source, ast);
+    const ast = new Parser(source, functionNames(functions)).parse();
+    cache.set(source, ast);
     return ast;
   } catch (error) {
     warnOnce(`表达式解析失败: ${source} -> ${(error as Error).message}`);
-    astCache.set(source, null);
+    cache.set(source, null);
     return null;
+  }
+}
+
+/** 静态校验算式语法：返回错误文案，合法返回 null（不执行任何值） */
+export function validateExpression(source: string, functions?: ExpressionFunctionMap): string | null {
+  try {
+    new Parser(source.trim(), functionNames(functions)).parse();
+    return null;
+  } catch (error) {
+    return (error as Error).message;
   }
 }
 
@@ -321,7 +367,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export function evaluateAst(ast: Ast, scope: Scope): unknown {
+export function evaluateAst(ast: Ast, scope: Scope, functions?: ExpressionFunctionMap): unknown {
   switch (ast.t) {
     case "lit":
       return ast.v;
@@ -329,10 +375,22 @@ export function evaluateAst(ast: Ast, scope: Scope): unknown {
     case "id":
       return FORBIDDEN_KEYS.has(ast.name) ? undefined : scope[ast.name];
 
+    case "call": {
+      const fn = functions?.[ast.name];
+      if (!fn) return undefined;
+      const args = ast.args.map((arg) => evaluateAst(arg, scope, functions));
+      try {
+        return fn(args);
+      } catch (error) {
+        warnOnce(`函数求值失败: ${ast.name} -> ${(error as Error).message}`);
+        return undefined;
+      }
+    }
+
     case "member": {
-      const obj = evaluateAst(ast.obj, scope);
+      const obj = evaluateAst(ast.obj, scope, functions);
       if (obj === null || obj === undefined) return undefined;
-      const key = evaluateAst(ast.key, scope);
+      const key = evaluateAst(ast.key, scope, functions);
       const keyStr = String(key);
       if (FORBIDDEN_KEYS.has(keyStr)) return undefined;
       if (typeof obj === "string") {
@@ -351,7 +409,7 @@ export function evaluateAst(ast: Ast, scope: Scope): unknown {
     }
 
     case "unary": {
-      const arg = evaluateAst(ast.arg, scope);
+      const arg = evaluateAst(ast.arg, scope, functions);
       if (ast.op === "!") return !arg;
       if (ast.op === "-") return typeof arg === "number" ? -arg : undefined;
       if (ast.op === "+") return typeof arg === "number" ? arg : undefined;
@@ -361,15 +419,15 @@ export function evaluateAst(ast: Ast, scope: Scope): unknown {
     case "binary": {
       // 短路运算先求左值
       if (ast.op === "&&") {
-        const left = evaluateAst(ast.l, scope);
-        return left ? evaluateAst(ast.r, scope) : left;
+        const left = evaluateAst(ast.l, scope, functions);
+        return left ? evaluateAst(ast.r, scope, functions) : left;
       }
       if (ast.op === "||") {
-        const left = evaluateAst(ast.l, scope);
-        return left ? left : evaluateAst(ast.r, scope);
+        const left = evaluateAst(ast.l, scope, functions);
+        return left ? left : evaluateAst(ast.r, scope, functions);
       }
-      const l = evaluateAst(ast.l, scope);
-      const r = evaluateAst(ast.r, scope);
+      const l = evaluateAst(ast.l, scope, functions);
+      const r = evaluateAst(ast.r, scope, functions);
       switch (ast.op) {
         case "===":
           return l === r;
@@ -407,7 +465,9 @@ export function evaluateAst(ast: Ast, scope: Scope): unknown {
     }
 
     case "cond":
-      return evaluateAst(ast.test, scope) ? evaluateAst(ast.cons, scope) : evaluateAst(ast.alt, scope);
+      return evaluateAst(ast.test, scope, functions)
+        ? evaluateAst(ast.cons, scope, functions)
+        : evaluateAst(ast.alt, scope, functions);
 
     default:
       return undefined;
@@ -452,6 +512,27 @@ export function resolveValue(value: unknown, scope: Scope): unknown {
     const result = evaluate(expr, scope);
     return result === undefined || result === null ? "" : String(result);
   });
+}
+
+/**
+ * 计算模块专用：在显式白名单函数表下求值算式。
+ * 与 `evaluate()` 的区别只在「允许调用白名单函数」，其余语法、路径、安全限制完全一致。
+ */
+export function evaluateWithFunctions(
+  expression: string,
+  scope: Scope = {},
+  functions: ExpressionFunctionMap = {},
+): unknown {
+  const source = expression.trim();
+  if (!source) return undefined;
+  const ast = parseCached(source, functions);
+  if (!ast) return undefined;
+  try {
+    return evaluateAst(ast, scope, functions);
+  } catch (error) {
+    warnOnce(`算式求值失败: ${source} -> ${(error as Error).message}`);
+    return undefined;
+  }
 }
 
 /** 求布尔：用于 show / if 指令 */
