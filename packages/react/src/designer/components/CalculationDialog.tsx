@@ -34,6 +34,7 @@ import type {
 import { useDesigner } from "../context";
 import type { CalculationTarget } from "../dialogs";
 import { ModalShell } from "./ModalShell";
+import { CalculationHelpDialog } from "./CalculationHelpDialog";
 
 interface DraftOperand {
   path: string;
@@ -120,6 +121,8 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
   const formulaRef = useRef<HTMLTextAreaElement | null>(null);
   /** 当前查看说明的函数；悬停 / 聚焦时切换，点击按钮仍只负责插入签名 */
   const [activeFn, setActiveFn] = useState<CalculationFunction | null>(null);
+  /** 完整使用说明（内容较长，单独一层弹窗承载） */
+  const [helpVisible, setHelpVisible] = useState(false);
 
   const elements = useMemo(
     () => collectConditionElements(state.page, { nodeId: target.nodeId }),
@@ -248,6 +251,7 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
     <ModalShell
       title="配置数据计算"
       width="760px"
+      escToClose={!helpVisible}
       onClose={onClose}
       footer={
         <>
@@ -349,7 +353,18 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
         {formulaError || "用变量名引用参与元素；支持 + - * / %、比较、三元与括号。"}
       </div>
 
-      <div className="calc__fn-label">高级函数（点击插入到光标处）</div>
+      <div className="calc__fn-title">
+        <span className="calc__fn-label">高级函数（点击插入到光标处）</span>
+        <button
+          type="button"
+          className="calc__help-btn"
+          title="查看完整使用说明（通用规则 / 18 个函数 / 业务配方 / 排错）"
+          aria-label="查看完整使用说明"
+          onClick={() => setHelpVisible(true)}
+        >
+          ?
+        </button>
+      </div>
       {functionGroups.map((group) => (
         <div className="calc__fn-group" key={group.group}>
           <span className="calc__fn-group-name">{group.group}</span>
@@ -390,7 +405,7 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
         </div>
       ) : (
         <div className="calc__fn-help calc__fn-help--empty">
-          悬停函数名查看参数、返回值与示例；点击函数名把签名插入算式。
+          悬停函数名查看单函数说明，点击函数插入签名；点右侧 ? 查看完整使用说明。
         </div>
       )}
 
@@ -536,6 +551,7 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
       ) : null}
 
       <div className="calc__preview">{preview}</div>
+      {helpVisible ? <CalculationHelpDialog onClose={() => setHelpVisible(false)} /> : null}
     </ModalShell>
   );
 }

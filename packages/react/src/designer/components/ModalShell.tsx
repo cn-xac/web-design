@@ -16,16 +16,18 @@ export interface ModalShellProps {
   children: ReactNode;
   /** 底栏动作区；不传则不渲染 footer */
   footer?: ReactNode;
+  /** 叠加二级弹窗时，外层置 false，避免一次 ESC 关掉两层并丢失未保存草稿 */
+  escToClose?: boolean;
 }
 
-export function ModalShell({ title, width = "520px", onClose, children, footer }: ModalShellProps) {
+export function ModalShell({ title, width = "520px", onClose, children, footer, escToClose = true }: ModalShellProps) {
   useEffect(() => {
     const onKeydown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") onClose();
+      if (escToClose && event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKeydown);
     return () => window.removeEventListener("keydown", onKeydown);
-  }, [onClose]);
+  }, [onClose, escToClose]);
 
   /** 点遮罩关闭：只有直接落在遮罩上才算，面板内部点击不触发 */
   const onBackdrop = (event: MouseEvent<HTMLDivElement>): void => {
