@@ -6,6 +6,9 @@ import { describe, expect, it } from "vitest";
 import {
   CALCULATION_FUNCTIONS,
   CALCULATION_FUNCTION_MAP,
+  CALCULATION_RECIPES,
+  CALCULATION_TROUBLESHOOTING,
+  CALCULATION_USAGE_NOTES,
   SCHEMA_VERSION,
   applyCalculations,
   canOwnCalculation,
@@ -128,6 +131,17 @@ describe("高级函数白名单", () => {
     expect(run("LEN('abcd')")).toBe(4);
     expect(run("COALESCE('', 0, 5)")).toBe(0);
     expect(run("ISBLANK('')")).toBe(true);
+  });
+});
+
+describe("高级函数使用说明常量（弹窗与手册同源）", () => {
+  it("通用规则、业务配方、排错表齐全且字段完整", () => {
+    expect(CALCULATION_USAGE_NOTES.length).toBeGreaterThanOrEqual(8);
+    expect(CALCULATION_RECIPES.length).toBeGreaterThanOrEqual(8);
+    expect(CALCULATION_TROUBLESHOOTING.length).toBeGreaterThanOrEqual(6);
+    expect(CALCULATION_RECIPES.every((item) => item.scene && item.operands && item.formula)).toBe(true);
+    expect(CALCULATION_TROUBLESHOOTING.every((item) => item.symptom && item.cause && item.fix)).toBe(true);
+    expect(CALCULATION_USAGE_NOTES.every((note) => note.length > 10)).toBe(true);
   });
 });
 

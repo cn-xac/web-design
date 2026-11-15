@@ -198,6 +198,35 @@ describe("React 设计器：数据计算弹窗", () => {
     }
   });
 
+  it("点问号打开完整使用说明弹窗，关闭后回到计算弹窗", async () => {
+    const ui = setup(
+      pageWith([
+        { id: "f1", component: "text", props: { label: "合计" } },
+        { id: "f2", component: "number", props: { label: "数量" } },
+      ]),
+    );
+    try {
+      await ui.render();
+      await ui.select("f1");
+      await openCalculationDialog(ui.container);
+
+      await click(ui.container.querySelector(".calc__help-btn"));
+      // 说明弹窗 createPortal 到 body，用 document 查询
+      const help = document.body.querySelector(".calc__help");
+      expect(help).toBeTruthy();
+      expect(document.body.querySelectorAll(".calc__help-fn")).toHaveLength(18);
+      expect(help?.textContent).toContain("一、通用规则");
+      expect(help?.textContent).toContain("三、常见业务配方");
+      expect(help?.textContent).toContain("四、限制与排错");
+
+      await click(document.body.querySelector(".calc__help-close"));
+      expect(document.body.querySelector(".calc__help")).toBeNull();
+      expect(ui.container.querySelector(".calc__formula")).toBeTruthy();
+    } finally {
+      await ui.cleanup();
+    }
+  });
+
   it("函数按钮插入签名；移除计算后配置消失", async () => {
     const ui = setup(
       pageWith([

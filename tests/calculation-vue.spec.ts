@@ -175,6 +175,39 @@ describe("Vue 设计器：数据计算弹窗", () => {
     wrapper.unmount();
   });
 
+  it("点问号打开完整使用说明弹窗，ESC 只关说明层、不丢计算草稿", async () => {
+    const { wrapper } = await mountDesigner();
+    await openCalculationDialog(wrapper);
+    await wrapper.find(".calc__formula").setValue("A * 2");
+
+    const helpButton = wrapper.find(".calc__help-btn");
+    expect(helpButton.exists()).toBe(true);
+    await helpButton.trigger("click");
+    await tick();
+
+    // 说明弹窗 Teleport 到 body，用 document 查询而不是 wrapper.find
+    const help = document.body.querySelector(".calc__help");
+    expect(help).toBeTruthy();
+    expect(document.body.querySelectorAll(".calc__help-fn")).toHaveLength(18);
+    expect(help!.textContent).toContain("一、通用规则");
+    expect(help!.textContent).toContain("二、函数参考");
+    expect(help!.textContent).toContain("三、常见业务配方");
+    expect(help!.textContent).toContain("四、限制与排错");
+    expect(
+      [...document.body.querySelectorAll(".wbd-modal__title")].some((title) =>
+        (title.textContent ?? "").includes("高级函数使用说明"),
+      ),
+    ).toBe(true);
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await tick();
+    expect(document.body.querySelector(".calc__help")).toBeNull();
+    // 外层计算弹窗仍在，草稿没被 ESC 一起关掉
+    expect(wrapper.find(".calc__formula").exists()).toBe(true);
+    expect((wrapper.find(".calc__formula").element as HTMLTextAreaElement).value).toBe("A * 2");
+    wrapper.unmount();
+  });
+
   it("非文字 / 数字元素的计算入口禁用", async () => {
     const { wrapper, store } = await mountDesigner();
     store.select("f2");
