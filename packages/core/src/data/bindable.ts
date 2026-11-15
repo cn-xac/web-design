@@ -425,17 +425,49 @@ export interface SpecialSettingItem {
   /** 展示名（物料标题 + 文本摘要） */
   label: string;
   component: string;
-  /** 元素标签：物料标题，列表里用来区分元素类型 */
+  /** 物料标题（元素类型），如「输入框」「按钮」 */
   title: string;
+  /**
+   * 元素标签：表单控件取 Label、按钮取按钮内容，其它按常见键兼容；
+   * 取不到就是空串（不拿物料标题凑数）。用于在列表里区分同名元素。
+   */
+  elementLabel: string;
   /** 绑定路径：同名元素靠它区分，子表单内带 [0] 占位 */
   path: string;
   flags: SpecialSettingFlags;
 }
 
-function nodeSummary(node: NodeSchema, material: Material | undefined): string {
+/** 读字符串属性；非字符串、缺省一律视为「没有」，保证「没有 Label 就置空」 */
+function propText(props: Record<string, unknown> | undefined, key: string): string {
+  const value = props?.[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * 元素标签：组件树与「特殊设置」列表共用的取值口径。
+ *
+ * 兼容规则（按物料类型分派，取不到就置空，不拿物料标题凑数）：
+ * - 表单控件：一律用 `props.label`（没有 Label 就置空），同类输入框靠 Label 区分；
+ * - 按钮 / 交互类：取按钮内容（`textProp`）；
+ * - 其它（文本、标签、容器、未登记物料）：`label` → 正文 → `title` → `content` 依次回退。
+ */
+export function elementLabelOf(node: NodeSchema, material?: Material): string {
+  const props = node.props;
+  if (material?.isFormControl) return propText(props, "label");
+  if (material?.kind === "action" && material.textProp) return propText(props, material.textProp);
   const textProp = material?.textProp;
-  const summary = textProp ? String(node.props?.[textProp] ?? "").trim() : "";
-  const tail = summary ? ` · ${summary.slice(0, 16)}` : "";
+  return (
+    propText(props, "label") ||
+    (textProp ? propText(props, textProp) : "") ||
+    propText(props, "title") ||
+    propText(props, "content")
+  );
+}
+
+/** 列表主名称：物料类型 + 元素标签（没有标签时只显示类型） */
+function nodeSummary(node: NodeSchema, material: Material | undefined): string {
+  const label = elementLabelOf(node, material);
+  const tail = label ? ` · ${label.slice(0, 16)}` : "";
   return `${material?.title ?? node.component}${tail}`;
 }
 
@@ -443,8 +475,8 @@ function nodeSummary(node: NodeSchema, material: Material | undefined): string {
  * 收集页面里带「特殊设置」的节点，供组件树的「特殊设置」tab 直观展示
  * （哪些元素用了外部数据源 / 显隐条件 / 校验 / 事件 / 高级计算）。
  *
- * 每行除了名称与配置标记，还给出 `title`（元素标签）与 `path`（绑定路径）：
- * 页面上同名元素很多，只靠名称无法区分，这两个字段是列表的去歧义依据。
+ * 每行除了名称与配置标记，还给出 `elementLabel`（表单控件的 Label / 按钮内容）与
+ * `path`（绑定路径）：页面上同名元素很多，只靠名称无法区分，这两个字段是去歧义依据。
  */
 export function collectSpecialSettings(
   page: PageSchema,
@@ -481,6 +513,7 @@ export function collectSpecialSettings(
           label: nodeSummary(node, material),
           component: node.component,
           title: material?.title ?? node.component,
+          elementLabel: elementLabelOf(node, material),
           path,
           flags,
         });
