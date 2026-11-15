@@ -5,6 +5,7 @@ import {
   compactNode,
   evaluateConditionGroup,
   evaluateConditionRow,
+  migratePage,
   resolveLoopInstances,
   resolveVisibility,
   validateAdvancedExpression,
@@ -40,29 +41,51 @@ const nodeWith = (visibility?: VisibilityConfig, directives?: NodeSchema["direct
 const hit = group([{ left: "form.type", operator: "eq", value: "company" }]);
 const miss = group([{ left: "form.type", operator: "eq", value: "person" }]);
 
-describe("显隐优先级（r5u4Ul）", () => {
-  it("显示高于隐藏：show 与 hide 同时命中时显示", () => {
-    const decision = resolveVisibility(nodeWith({ show: hit, hide: hit }), scope);
-    expect(decision).toMatchObject({ visible: true, source: "local-show" });
+describe("显隐判定（1.3.0 单一 when + action，完整布尔闭环）", () => {
+  it("action=show（缺省）：命中显示，未命中隐藏，无中间态", () => {
+    expect(resolveVisibility(nodeWith({ when: hit }), scope)).toMatchObject({
+      visible: true,
+      source: "local-show",
+    });
+    expect(resolveVisibility(nodeWith({ when: miss }), scope)).toMatchObject({
+      visible: false,
+      source: "local-hide",
+    });
+    // 显式 action=show 与缺省等价
+    expect(resolveVisibility(nodeWith({ when: hit, action: "show" }), scope)).toMatchObject({
+      visible: true,
+      source: "local-show",
+    });
   });
 
-  it("仅 hide 命中时隐藏，隐藏方式为 display:none", () => {
-    const decision = resolveVisibility(nodeWith({ hide: hit }), scope);
-    expect(decision).toMatchObject({ visible: false, source: "local-hide", mode: "show" });
+  it("action=hide：命中隐藏（display:none），未命中显示", () => {
+    expect(resolveVisibility(nodeWith({ when: hit, action: "hide" }), scope)).toMatchObject({
+      visible: false,
+      source: "local-hide",
+      mode: "show",
+    });
+    expect(resolveVisibility(nodeWith({ when: miss, action: "hide" }), scope)).toMatchObject({
+      visible: true,
+      source: "local-show",
+    });
   });
 
-  it("外部 force 忽略本地 show 条件", () => {
-    const decision = resolveVisibility(nodeWith({ show: hit }), scope, { n1: { visible: false, force: true } });
+  it("外部 force 忽略本地 when 条件", () => {
+    const decision = resolveVisibility(nodeWith({ when: hit }), scope, { n1: { visible: false, force: true } });
     expect(decision).toMatchObject({ visible: false, source: "external-force" });
   });
 
-  it("外部非强制时本地条件优先", () => {
-    const decision = resolveVisibility(nodeWith({ hide: hit }), scope, { n1: { visible: true } });
+  it("外部非强制时本地 when 判定优先", () => {
+    const decision = resolveVisibility(nodeWith({ when: hit, action: "hide" }), scope, { n1: { visible: true } });
     expect(decision).toMatchObject({ visible: false, source: "local-hide" });
   });
 
-  it("外部非强制在本地条件均未命中时生效", () => {
-    const decision = resolveVisibility(nodeWith({ hide: miss }), scope, { n1: { visible: false } });
+  it("when 为空（未配置条件）时视为无本地配置，回落外部非强制值", () => {
+    const decision = resolveVisibility(
+      nodeWith({ when: { mode: "and", rows: [] } }),
+      scope,
+      { n1: { visible: false } },
+    );
     expect(decision).toMatchObject({ visible: false, source: "external" });
   });
 
@@ -171,7 +194,7 @@ describe("for 指令统一展开", () => {
 });
 
 describe("Schema 契约与往返", () => {
-  const config: VisibilityConfig = { show: hit, hide: miss };
+  const config: VisibilityConfig = { when: hit, action: "show" };
   const page: PageSchema = {
     schemaVersion: SCHEMA_VERSION,
     id: "p",
@@ -182,14 +205,17 @@ describe("Schema 契约与往返", () => {
 
   it("合法 visibility 通过校验", () => {
     expect(validatePage(page).valid).toBe(true);
+    expect(SCHEMA_VERSION).toBe("1.3.0");
   });
 
-  it("非法关系 / 半成品条件 / 越界高级表达式会被阻断", () => {
+  it("非法 action / 关系 / 半成品条件 / 越界高级表达式会被阻断", () => {
     const illegal = (visibility: unknown): boolean =>
       validatePage({ ...page, children: [{ id: "n1", component: "ec-input", visibility }] } as PageSchema).valid;
-    expect(illegal({ show: { mode: "and", rows: [{ left: "form.a", operator: "wat" }] } })).toBe(false);
-    expect(illegal({ show: { mode: "and", rows: [{ left: "form.a" }] } })).toBe(false);
-    expect(illegal({ show: { mode: "advanced", rows: [{ value: true }], expression: "1 and 3" } })).toBe(false);
+    expect(illegal({ when: hit, action: "toggle" })).toBe(false);
+    expect(illegal({ when: { mode: "and", rows: [{ left: "form.a", operator: "wat" }] } })).toBe(false);
+    expect(illegal({ when: { mode: "and", rows: [{ left: "form.a" }] } })).toBe(false);
+    expect(illegal({ when: { mode: "advanced", rows: [{ value: true }], expression: "1 and 3" } })).toBe(false);
+    expect(illegal({ show: hit })).toBe(false); // 旧双组结构不再合法
   });
 
   it("序列化与复制粘贴保留 visibility", () => {
@@ -197,5 +223,24 @@ describe("Schema 契约与往返", () => {
     const cloned = cloneWithNewIds(page.children[0]);
     expect(cloned.visibility).toEqual(config);
     expect(cloned.visibility).not.toBe(page.children[0].visibility);
+  });
+
+  it("1.2.0 旧 show/hide 配置在迁移到 1.3.0 时被丢弃，结构保持合法", () => {
+    const legacy = {
+      schemaVersion: "1.2.0",
+      id: "p",
+      type: "page",
+      children: [
+        { id: "n1", component: "ec-input", visibility: { show: hit, hide: miss } },
+        { id: "n2", component: "ec-input", visibility: { when: hit, action: "hide" } },
+      ],
+    };
+    const { schema, applied } = migratePage(legacy);
+    expect(applied).toEqual(["1.2.0 -> 1.3.0"]);
+    expect(schema.schemaVersion).toBe("1.3.0");
+    // 旧双组无法无损映射 → 丢弃
+    expect((schema.children[0] as NodeSchema).visibility).toBeUndefined();
+    // 已是新结构 → 原样保留
+    expect((schema.children[1] as NodeSchema).visibility).toEqual({ when: hit, action: "hide" });
   });
 });

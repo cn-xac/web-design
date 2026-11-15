@@ -53,30 +53,30 @@ async function mountWithNodes(target: NodeSchema) {
   return { wrapper, store };
 }
 
-async function openConditionDialog(wrapper: Awaited<ReturnType<typeof mountWithNodes>>["wrapper"], index: number) {
+async function openConditionDialog(wrapper: Awaited<ReturnType<typeof mountWithNodes>>["wrapper"]) {
   const tabs = wrapper.findAll(".inspector__tab");
   const styleTab = tabs.find((tab) => tab.text().includes("样式"));
   expect(styleTab).toBeTruthy();
   await styleTab!.trigger("click");
   await tick();
 
-  // 样式面板还有「数据计算」入口，条件按钮按专属选择器排除它
+  // 1.3.0 起条件只有一个入口（数据计算入口按专属选择器排除）
   const buttons = wrapper.findAll(".style__cond-btn:not(.style__calc-btn)");
-  expect(buttons).toHaveLength(2);
-  await buttons[index].trigger("click");
+  expect(buttons).toHaveLength(1);
+  await buttons[0].trigger("click");
   await tick();
 }
 
 describe("设计器：显示 / 隐藏条件弹窗", () => {
-  it("打开弹窗、选左元素与关系、保存后写回 node.visibility", async () => {
+  it("打开弹窗、选左元素与关系、默认 action=show 写回 node.visibility", async () => {
     const { wrapper, store } = await mountWithNodes({
       id: "f1",
       component: "input",
       props: { label: "姓名" },
     });
 
-    await openConditionDialog(wrapper, 0);
-    expect(wrapper.find(".wbd-modal__title").text()).toContain("配置显示条件");
+    await openConditionDialog(wrapper);
+    expect(wrapper.find(".wbd-modal__title").text()).toContain("配置显示 / 隐藏条件");
     expect(wrapper.findAll(".cond__row")).toHaveLength(1);
 
     await wrapper.find(".cond__left").setValue("form.f2");
@@ -84,20 +84,25 @@ describe("设计器：显示 / 隐藏条件弹窗", () => {
     await wrapper.find(".cond__ok").trigger("click");
     await tick();
 
-    const group = store.page.children[0].visibility?.show;
-    expect(group?.mode).toBe("and");
-    expect(group?.rows[0]).toMatchObject({ left: "form.f2", operator: "eq", value: "sales" });
+    const visibility = store.page.children[0].visibility;
+    expect(visibility?.action).toBe("show");
+    expect(visibility?.when.mode).toBe("and");
+    expect(visibility?.when.rows[0]).toMatchObject({ left: "form.f2", operator: "eq", value: "sales" });
   });
 
-  it("高级模式按序号组合，保存后模式与表达式完整", async () => {
+  it("切到「命中时隐藏」+ 高级模式，保存后 action 与表达式完整", async () => {
     const { wrapper, store } = await mountWithNodes({
       id: "f1",
       component: "input",
       props: { label: "姓名" },
     });
 
-    await openConditionDialog(wrapper, 1);
-    expect(wrapper.find(".wbd-modal__title").text()).toContain("配置隐藏条件");
+    await openConditionDialog(wrapper);
+
+    // action 单选：切到隐藏
+    const hideAction = wrapper.findAll(".cond__mode").find((button) => button.text().includes("命中时隐藏"));
+    expect(hideAction).toBeTruthy();
+    await hideAction!.trigger("click");
 
     await wrapper.find(".cond__add").trigger("click");
     await wrapper.find(".cond__add").trigger("click");
@@ -116,21 +121,23 @@ describe("设计器：显示 / 隐藏条件弹窗", () => {
     await wrapper.find(".cond__ok").trigger("click");
     await tick();
 
-    const group = store.page.children[0].visibility?.hide;
-    expect(group?.mode).toBe("advanced");
-    expect(group?.expression).toBe("1 and (2 or 3)");
-    expect(group?.rows).toHaveLength(3);
-    expect(group?.rows[0]).toEqual({ value: "true" });
+    const visibility = store.page.children[0].visibility;
+    expect(visibility?.action).toBe("hide");
+    expect(visibility?.when.mode).toBe("advanced");
+    expect(visibility?.when.expression).toBe("1 and (2 or 3)");
+    expect(visibility?.when.rows).toHaveLength(3);
+    expect(visibility?.when.rows[0]).toEqual({ value: "true" });
   });
 
-  it("条件摘要在面板上可见，不打开弹窗也能看出配置状态", async () => {
+  it("条件摘要在面板上可见，含模式与命中动作", async () => {
     const { wrapper, store } = await mountWithNodes({
       id: "f1",
       component: "input",
       props: { label: "姓名" },
     });
     store.setVisibility({
-      show: { mode: "or", rows: [{ left: "form.f2", operator: "eq", value: "x" }] },
+      when: { mode: "or", rows: [{ left: "form.f2", operator: "eq", value: "x" }] },
+      action: "hide",
     });
     await tick();
 
@@ -139,7 +146,8 @@ describe("设计器：显示 / 隐藏条件弹窗", () => {
     await styleTab!.trigger("click");
     await tick();
 
-    expect(wrapper.findAll(".style__cond-btn:not(.style__calc-btn)")[0].text()).toContain("1 条 · 或者");
+    const summary = wrapper.findAll(".style__cond-btn:not(.style__calc-btn)")[0].text();
+    expect(summary).toContain("1 条 · 或者 · 命中隐藏");
   });
 });
 

@@ -353,13 +353,13 @@ describe("协议校验与落库", () => {
     expect(toJSON(JSON.parse(first))).toBe(first);
   });
 
-  it("1.1.0 → 1.2.0 迁移只推进版本号", () => {
+  it("1.1.0 起链式迁移到当前版本，只推进版本号并保留 calculation", () => {
     const old = { ...pageWith(config()), schemaVersion: "1.1.0" };
     const { schema, applied } = migratePage(old);
-    expect(schema.schemaVersion).toBe("1.2.0");
-    expect(applied).toEqual(["1.1.0 -> 1.2.0"]);
+    expect(schema.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(applied).toEqual(["1.1.0 -> 1.2.0", "1.2.0 -> 1.3.0"]);
     expect(schema.children[2].calculation).toEqual(config());
-    expect(SCHEMA_VERSION).toBe("1.2.0");
+    expect(SCHEMA_VERSION).toBe("1.3.0");
   });
 
   it("只有文字 / 数字元素能配置计算，目标清单能拿到回填路径", () => {

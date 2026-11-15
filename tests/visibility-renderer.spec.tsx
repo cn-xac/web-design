@@ -14,7 +14,7 @@ const state = { form: { type: "company", qty: 3 }, list: [1, 2] };
 
 function makePage(node: NodeSchema): PageSchema {
   return {
-    schemaVersion: "1.1.0",
+    schemaVersion: "1.3.0",
     id: "p_visibility",
     type: "page",
     meta: { title: "显隐渲染", device: "pc" },
@@ -26,6 +26,10 @@ function makePage(node: NodeSchema): PageSchema {
 const hit = {
   mode: "and" as const,
   rows: [{ left: "form.type", operator: "eq" as const, value: "company" }],
+};
+const miss = {
+  mode: "and" as const,
+  rows: [{ left: "form.type", operator: "eq" as const, value: "person" }],
 };
 
 const textNode = (visibility?: NodeSchema["visibility"], directives?: NodeSchema["directives"]): NodeSchema => ({
@@ -40,26 +44,28 @@ function mountVue(page: PageSchema, visibility?: Record<string, { visible: boole
   return mount(VueRenderer, { props: { page, ...(visibility ? { visibility } : {}) } });
 }
 
-describe("Vue 渲染器：显隐优先级", () => {
-  it("隐藏条件命中时包裹层带 is-hidden", () => {
-    const wrapper = mountVue(makePage(textNode({ hide: hit })));
+describe("Vue 渲染器：显隐判定（when + action）", () => {
+  it("action=hide 命中时包裹层带 is-hidden", () => {
+    const wrapper = mountVue(makePage(textNode({ when: hit, action: "hide" })));
     expect(wrapper.find(".wb-node.is-hidden").exists()).toBe(true);
   });
 
-  it("显示条件命中时覆盖隐藏条件", () => {
-    const wrapper = mountVue(makePage(textNode({ show: hit, hide: hit })));
-    expect(wrapper.find(".wb-node.is-hidden").exists()).toBe(false);
-  });
-
-  it("外部强制控制优先于本地条件", () => {
-    const hidden = mountVue(makePage(textNode({ show: hit })), { t1: { visible: false, force: true } });
+  it("action=show 未命中即隐藏，命中即显示（无中间态）", () => {
+    const hidden = mountVue(makePage(textNode({ when: miss })));
     expect(hidden.find(".wb-node.is-hidden").exists()).toBe(true);
-
-    const shown = mountVue(makePage(textNode({ hide: hit })), { t1: { visible: true, force: true } });
+    const shown = mountVue(makePage(textNode({ when: hit })));
     expect(shown.find(".wb-node.is-hidden").exists()).toBe(false);
   });
 
-  it("外部非强制在本地条件均未命中时生效", () => {
+  it("外部强制控制优先于本地条件", () => {
+    const hidden = mountVue(makePage(textNode({ when: hit })), { t1: { visible: false, force: true } });
+    expect(hidden.find(".wb-node.is-hidden").exists()).toBe(true);
+
+    const shown = mountVue(makePage(textNode({ when: hit, action: "hide" })), { t1: { visible: true, force: true } });
+    expect(shown.find(".wb-node.is-hidden").exists()).toBe(false);
+  });
+
+  it("未配置 visibility 时外部非强制值生效", () => {
     const wrapper = mountVue(makePage(textNode()), { t1: { visible: false } });
     expect(wrapper.find(".wb-node.is-hidden").exists()).toBe(true);
   });
@@ -73,9 +79,9 @@ describe("Vue 渲染器：显隐优先级", () => {
 });
 
 describe("React / 静态 HTML 导出：同一份 Schema 结果一致", () => {
-  it("隐藏条件命中时输出 display:none，显示命中时不输出", () => {
-    const hidden = makePage(textNode({ hide: hit }));
-    const shown = makePage(textNode({ show: hit, hide: hit }));
+  it("action=hide 命中输出 display:none，action=show 命中不输出", () => {
+    const hidden = makePage(textNode({ when: hit, action: "hide" }));
+    const shown = makePage(textNode({ when: hit }));
     expect(renderToStaticMarkup(<ReactRenderer page={hidden} />)).toContain("display:none");
     expect(renderToStaticMarkup(<ReactRenderer page={shown} />)).not.toContain("display:none");
     expect(toHtml(hidden)).toContain("display:none");
@@ -84,7 +90,7 @@ describe("React / 静态 HTML 导出：同一份 Schema 结果一致", () => {
 
   it("外部 force 控制同样作用于 React 渲染器", () => {
     const markup = renderToStaticMarkup(
-      <ReactRenderer page={makePage(textNode({ show: hit }))} visibility={{ t1: { visible: false, force: true } }} />,
+      <ReactRenderer page={makePage(textNode({ when: hit }))} visibility={{ t1: { visible: false, force: true } }} />,
     );
     expect(markup).toContain("display:none");
   });
@@ -103,7 +109,7 @@ describe("React / 静态 HTML 导出：同一份 Schema 结果一致", () => {
 
 describe("子表单：运行时行级隔离", () => {
   const subformPage: PageSchema = {
-    schemaVersion: "1.1.0",
+    schemaVersion: "1.3.0",
     id: "p_subform_visibility",
     type: "page",
     meta: { title: "子表单显隐" },
@@ -120,10 +126,11 @@ describe("子表单：运行时行级隔离", () => {
             props: { text: "明细行" },
             // 只能读本行 qty；若隔离失效，outside 的存在会让条件仍能命中
             visibility: {
-              hide: {
+              when: {
                 mode: "and",
                 rows: [{ left: "form.orders[0].qty", operator: "gt", value: 3 }],
               },
+              action: "hide",
             },
           },
         ],
@@ -139,8 +146,8 @@ describe("子表单：运行时行级隔离", () => {
   it("子表单内条件读不到外部字段，隔离生效", () => {
     const isolatedPage: PageSchema = JSON.parse(JSON.stringify(subformPage)) as PageSchema;
     const child = isolatedPage.children[0].children?.[0];
-    if (child?.visibility?.hide) {
-      child.visibility.hide.rows = [{ left: "form.outside", operator: "eq", value: "company" }];
+    if (child?.visibility?.when) {
+      child.visibility.when.rows = [{ left: "form.outside", operator: "eq", value: "company" }];
     }
     const wrapper = mount(VueRenderer, { props: { page: isolatedPage } });
     expect(wrapper.findAll(".wb-node.is-hidden")).toHaveLength(0);

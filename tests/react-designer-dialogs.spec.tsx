@@ -436,7 +436,7 @@ describe("React 设计器：外部数据源弹窗", () => {
 });
 
 describe("React 设计器：显示隐藏条件弹窗", () => {
-  it("配置一条显示条件后写进 node.visibility", async () => {
+  it("配置一条条件后写进 node.visibility（缺省 action=show）", async () => {
     const ui = setup(
       pageWith([
         { id: "i1", component: "input", props: { label: "姓名" } },
@@ -449,12 +449,12 @@ describe("React 设计器：显示隐藏条件弹窗", () => {
       await ui.select("i1");
 
       await click(byText(ui.container, ".inspector__tab", "样式"));
-      // 排除新增的「数据计算」入口，只取显示 / 隐藏条件按钮
+      // 1.3.0 起条件只有一个入口（排除「数据计算」入口）
       const trigger = byText(ui.container, ".style__cond-btn:not(.style__calc-btn)", "未配置");
       expect(trigger).toBeTruthy();
       await click(trigger);
 
-      expect(ui.container.querySelector(".wbd-modal__title")?.textContent).toBe("配置显示条件");
+      expect(ui.container.querySelector(".wbd-modal__title")?.textContent).toBe("配置显示 / 隐藏条件");
 
       const left = ui.container.querySelector(".cond__left") as HTMLSelectElement;
       const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!;
@@ -466,8 +466,41 @@ describe("React 设计器：显示隐藏条件弹窗", () => {
       await click(ui.container.querySelector(".cond__ok"));
 
       const visibility = ui.nodeOf("i1")?.visibility;
-      expect(visibility?.show?.rows).toHaveLength(1);
-      expect(visibility?.show?.rows[0]).toMatchObject({ left: "form.f2", operator: "eq", value: "张三" });
+      expect(visibility?.action).toBe("show");
+      expect(visibility?.when.rows).toHaveLength(1);
+      expect(visibility?.when.rows[0]).toMatchObject({ left: "form.f2", operator: "eq", value: "张三" });
+    } finally {
+      await ui.cleanup();
+    }
+  });
+
+  it("切到「命中时隐藏」后保存 action=hide", async () => {
+    const ui = setup(
+      pageWith([
+        { id: "i1", component: "input", props: { label: "姓名" } },
+        { id: "f2", component: "input", props: { label: "部门" } },
+      ]),
+    );
+    try {
+      await ui.render();
+      await ui.select("i1");
+
+      await click(byText(ui.container, ".inspector__tab", "样式"));
+      await click(byText(ui.container, ".style__cond-btn:not(.style__calc-btn)", "未配置"));
+      await click(byText(ui.container, ".cond__mode", "命中时隐藏"));
+
+      const left = ui.container.querySelector(".cond__left") as HTMLSelectElement;
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!;
+      await act(async () => {
+        setter.call(left, "form.f2");
+        left.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await typeInto(ui.container.querySelector(".cond__value") as HTMLInputElement, "张三");
+      await click(ui.container.querySelector(".cond__ok"));
+
+      const visibility = ui.nodeOf("i1")?.visibility;
+      expect(visibility?.action).toBe("hide");
+      expect(visibility?.when.rows).toHaveLength(1);
     } finally {
       await ui.cleanup();
     }
