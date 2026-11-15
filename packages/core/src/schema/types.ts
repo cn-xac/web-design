@@ -48,7 +48,7 @@ export interface NodeSchema {
   externalRef?: string;
   /**
    * 显示 / 隐藏控制（r5u4Ul）。配置在目标节点自身，只控制该节点。
-   * 与 directives 并存：未配置时回落到旧指令，旧 Schema 行为不变。
+   * 1.3.0 起为单一 when 条件组 + action 方向；未配置时回落到旧指令。
    */
   visibility?: VisibilityConfig;
   /**
@@ -92,8 +92,11 @@ export interface PageSchema {
   children: NodeSchema[];
 }
 
-/** 1.2.0：新增节点级 calculation 配置（rtHicl）；1.1.0 起支持 visibility，旧字段语义未变 */
-export const SCHEMA_VERSION = "1.2.0";
+/**
+ * 1.3.0：visibility 收敛为单一 when 条件组 + action 方向（移除 show/hide 双组，消除中间态）。
+ * 1.2.0 新增节点级 calculation（rtHicl）；1.1.0 起支持 visibility。
+ */
+export const SCHEMA_VERSION = "1.3.0";
 
 export function createEmptyPage(title = "未命名页面"): PageSchema {
   return {

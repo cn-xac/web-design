@@ -1,7 +1,9 @@
 /**
  * Schema 版本迁移。原则：只增不改；语义变更必须升版本并在这里补一条迁移函数。
  *
- * 当前只有 1.0.0，迁移为空实现；后续版本按 MIGRATIONS 顺序链式执行。
+ * 按 MIGRATIONS 顺序链式执行。1.3.0 的 visibility 语义变更（show/hide → when/action）
+ * 因本项目无存量用户，采用丢弃式迁移：直接移除节点上无法无损映射的旧 visibility，
+ * 让导入结果保持合法结构，不做旧语义兼容。
  */
 
 import { SCHEMA_VERSION, type PageSchema } from "./types";
@@ -28,6 +30,34 @@ const MIGRATIONS: MigrationEntry[] = [
     from: "1.1.0",
     to: "1.2.0",
     run: (schema) => schema,
+  },
+  {
+    // 1.3.0：visibility 由 show/hide 双组改为单一 when + action。旧双组无法无损映射
+    // （语义从「命中触发器」变为「完整布尔闭环」），且本项目无存量用户，直接丢弃旧配置。
+    from: "1.2.0",
+    to: "1.3.0",
+    run: (schema) => {
+      const strip = (nodes: unknown): void => {
+        if (!Array.isArray(nodes)) return;
+        for (const raw of nodes) {
+          if (typeof raw !== "object" || raw === null) continue;
+          const node = raw as Record<string, unknown>;
+          const visibility = node.visibility as Record<string, unknown> | undefined;
+          // 旧结构有 show 或 hide 键、且没有新的 when 键 → 整块丢弃
+          if (
+            visibility &&
+            typeof visibility === "object" &&
+            ("show" in visibility || "hide" in visibility) &&
+            !("when" in visibility)
+          ) {
+            delete node.visibility;
+          }
+          strip(node.children);
+        }
+      };
+      strip(schema.children);
+      return schema;
+    },
   },
 ];
 

@@ -1,9 +1,10 @@
 /**
  * 条件求值与显隐判定（纯函数，core 内不访问任何浏览器 API）。
  *
- * 优先级（@todo r5u4Ul 已定口径）：
- *   外部 force → 本地 show → 本地 hide → 外部非强制 → 旧 directives → 默认显示。
- *   「显示高于隐藏」= show 命中时忽略 hide。
+ * 优先级（1.3.0 单一条件组模型）：
+ *   外部 force → 本地 when（命中执行 action，不命中取反）→ 外部非强制 → 旧 directives → 默认显示。
+ *   when 一旦配置即为完整布尔闭环，不存在「条件未命中」的中间态；
+ *   只有完全未配置 visibility 的节点才会继续回落到外部 / directives / 默认显示。
  */
 
 import { evaluate, getByPath, resolveBoolean, resolveValue, type Scope } from "../schema/expression";
@@ -420,11 +421,13 @@ export function resolveVisibility(
   }
 
   const config = node.visibility;
-  if (config?.show && evaluateConditionGroup(config.show, scope, ctx)) {
-    return { visible: true, source: "local-show" };
-  }
-  if (config?.hide && evaluateConditionGroup(config.hide, scope, ctx)) {
-    return { visible: false, mode: "show", source: "local-hide" };
+  // when 存在且非空即视为完整判定：命中执行 action，不命中取反，无中间态。
+  if (config?.when && config.when.rows.length > 0) {
+    const matched = evaluateConditionGroup(config.when, scope, ctx);
+    const visible = (config.action ?? "show") === "show" ? matched : !matched;
+    return visible
+      ? { visible: true, source: "local-show" }
+      : { visible: false, mode: "show", source: "local-hide" };
   }
 
   if (entry) {

@@ -166,14 +166,15 @@ export function validatePage(input: unknown, knownComponents?: Set<string>): Val
         if (!isRecord(node.visibility)) {
           error(`${at}.visibility`, "visibility 必须是对象");
         } else {
-          (["show", "hide"] as const).forEach((kind) => {
-            const group = node.visibility?.[kind];
-            if (group === undefined) return;
-            const groupPath = `${at}.visibility.${kind}`;
-            if (!isRecord(group) || !Array.isArray(group.rows) || !CONDITION_MODES.has(String(group.mode))) {
-              error(groupPath, "条件组必须包含合法 mode 与 rows 数组");
-              return;
-            }
+          // 1.3.0：单一 when 条件组 + action 方向，旧的 show / hide 双组已移除
+          if (node.visibility.action !== undefined && !["show", "hide"].includes(String(node.visibility.action))) {
+            error(`${at}.visibility.action`, 'action 只能是 "show" 或 "hide"');
+          }
+          const group = node.visibility.when;
+          const groupPath = `${at}.visibility.when`;
+          if (!isRecord(group) || !Array.isArray(group.rows) || !CONDITION_MODES.has(String(group.mode))) {
+            error(groupPath, "visibility.when 条件组必须包含合法 mode 与 rows 数组");
+          } else {
             const rows = group.rows as unknown[];
             rows.forEach((rawRow, ri) => {
               const rowPath = `${groupPath}.rows[${ri}]`;
@@ -201,7 +202,7 @@ export function validatePage(input: unknown, knownComponents?: Set<string>): Val
               const message = validateAdvancedExpression(group.expression, rows.length);
               if (message) error(`${groupPath}.expression`, message);
             }
-          });
+          }
         }
       }
 

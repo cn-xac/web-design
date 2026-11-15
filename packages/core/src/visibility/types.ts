@@ -7,8 +7,10 @@
  *   数据计算 (rtHicl) 的条件参与可直接复用 `ConditionGroup`；
  * - 全部是纯数据，JSON 里不出现可执行代码。
  *
- * 与旧 `directives` 的关系：两者并存，旧 Schema 不迁移、行为不变；
- * 新配置优先级更高，未配置时回落到 directives。
+ * 与旧 `directives` 的关系：两者并存；新配置优先级更高，未配置时回落到 directives。
+ *
+ * 1.3.0 起 visibility 收敛为单一 `when` 条件组 + `action` 方向，旧的 show/hide
+ * 双组已移除；本项目无存量数据，升版本不写兼容迁移。
  */
 
 /** 引用子表单明细字段时的聚合口径；缺省为求和 */
@@ -59,13 +61,32 @@ export interface ConditionGroup {
   expression?: string;
 }
 
-/** 节点自身的显隐控制配置 */
+/** 命中判定条件后执行的显隐动作 */
+export type VisibilityAction = "show" | "hide";
+
+/**
+ * 节点自身的显隐控制配置（1.3.0 起为单一条件组 + 动作）。
+ *
+ * 语义：`when` 命中时执行 `action`，未命中时执行相反动作——完整布尔闭环，
+ * 不存在「条件都没命中」的中间态。这样可彻底消除旧 show/hide 双组设计里
+ * 「只配 show 却期望不命中即隐藏」的歧义。
+ *
+ * - `action` 缺省 `show`：命中即显示，不命中即隐藏（最常用）；
+ * - `action: "hide"`：命中即隐藏，不命中即显示；
+ * - 隐藏统一用 display:none（mode: "show"），不渲染请继续用旧 directives.if。
+ */
 export interface VisibilityConfig {
-  /** 命中则显示（优先级高于 hide） */
-  show?: ConditionGroup;
-  /** 仅在 show 未命中时生效，命中则隐藏 */
-  hide?: ConditionGroup;
+  /** 唯一的判定条件组 */
+  when: ConditionGroup;
+  /** 命中 when 时执行的行为，缺省 show */
+  action?: VisibilityAction;
 }
+
+/** 对外暴露的 action 可选项，供设计器单选控件复用 */
+export const VISIBILITY_ACTIONS: ReadonlyArray<{ value: VisibilityAction; label: string; hint: string }> = [
+  { value: "show", label: "命中时显示", hint: "条件成立时显示，否则隐藏" },
+  { value: "hide", label: "命中时隐藏", hint: "条件成立时隐藏，否则显示" },
+];
 
 /** 宿主按节点 id 传入的显隐控制 */
 export interface ExternalVisibilityEntry {
