@@ -321,14 +321,9 @@ export function StyleEditor() {
 
       <div className="style__section">显示 / 隐藏条件</div>
       <div className="style__row style__row--block">
-        <label>显示条件</label>
-        <ConditionTrigger kind="show" />
-        <div className="style__tip">命中即显示，优先级高于隐藏条件</div>
-      </div>
-      <div className="style__row style__row--block">
-        <label>隐藏条件</label>
-        <ConditionTrigger kind="hide" />
-        <div className="style__tip">仅在显示条件未命中时生效</div>
+        <label>条件显隐</label>
+        <ConditionTrigger />
+        <div className="style__tip">一组条件 + 命中动作，未命中取反，无中间态</div>
       </div>
 
       <div className="style__section">显示与循环（旧指令）</div>

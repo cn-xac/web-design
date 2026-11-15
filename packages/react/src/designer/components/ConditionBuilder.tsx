@@ -11,17 +11,18 @@ import { CONDITION_MODE_OPTIONS } from "@x-ac/web-design-core";
 import { useDesigner } from "../context";
 import { useDesignerDialogs } from "../dialogs";
 
-export function ConditionTrigger({ kind }: { kind: "show" | "hide" }) {
+export function ConditionTrigger() {
   const { state } = useDesigner();
   const dialogs = useDesignerDialogs();
   const node = state.selectedNode;
   if (!node) return null;
 
-  const group = node.visibility?.[kind];
+  const group = node.visibility?.when;
   const summary = (() => {
     if (!group?.rows.length) return "未配置";
     const mode = CONDITION_MODE_OPTIONS.find((option) => option.value === group.mode)?.label ?? group.mode;
-    return `${group.rows.length} 条 · ${mode}`;
+    const action = node.visibility?.action ?? "show";
+    return `${group.rows.length} 条 · ${mode} · ${action === "hide" ? "命中隐藏" : "命中显示"}`;
   })();
 
   return (
@@ -32,7 +33,6 @@ export function ConditionTrigger({ kind }: { kind: "show" | "hide" }) {
         dialogs.openConditions({
           nodeId: node.id,
           label: String(node.props?.label ?? node.component),
-          kind,
         })
       }
     >

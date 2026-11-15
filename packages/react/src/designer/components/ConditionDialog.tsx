@@ -14,11 +14,18 @@ import {
   CONDITION_AGGREGATES,
   CONDITION_MODE_OPTIONS,
   CONDITION_OPERATOR_OPTIONS,
+  VISIBILITY_ACTIONS,
   collectConditionElements,
   findLocation,
   validateAdvancedExpression,
 } from "@x-ac/web-design-core";
-import type { ConditionGroup, ConditionMode, ConditionRow, VisibilityConfig } from "@x-ac/web-design-core";
+import type {
+  ConditionGroup,
+  ConditionMode,
+  ConditionRow,
+  VisibilityAction,
+  VisibilityConfig,
+} from "@x-ac/web-design-core";
 import { useDesigner } from "../context";
 import type { ConditionTarget } from "../dialogs";
 import { ModalShell } from "./ModalShell";
@@ -57,8 +64,9 @@ export interface ConditionDialogProps {
 export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
   const { store, state, notify } = useDesigner();
 
-  const initialGroup = findLocation(state.page.children ?? [], target.nodeId)?.node?.visibility?.[target.kind];
-  const [draft, setDraft] = useState<Draft>(() => normalize(initialGroup));
+  const visibility = findLocation(state.page.children ?? [], target.nodeId)?.node?.visibility;
+  const [draft, setDraft] = useState<Draft>(() => normalize(visibility?.when));
+  const [action, setAction] = useState<VisibilityAction>(visibility?.action ?? "show");
 
   const elements = useMemo(
     () => collectConditionElements(state.page, { nodeId: target.nodeId }),
@@ -122,27 +130,29 @@ export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
       notify(expressionError, "error");
       return;
     }
-    const node = findLocation(state.page.children ?? [], target.nodeId)?.node;
-    const next: VisibilityConfig = { ...(node?.visibility ?? {}) };
     const rows = cleanRows(draft.rows);
-    if (!rows.length) delete next[target.kind];
-    else {
-      next[target.kind] = {
-        mode: draft.mode,
-        rows,
-        ...(draft.mode === "advanced" && draft.expression
-          ? { expression: draft.expression.trim() }
-          : {}),
+    if (!rows.length) {
+      store.setVisibility(undefined);
+    } else {
+      const next: VisibilityConfig = {
+        when: {
+          mode: draft.mode,
+          rows,
+          ...(draft.mode === "advanced" && draft.expression
+            ? { expression: draft.expression.trim() }
+            : {}),
+        },
+        action,
       };
+      store.setVisibility(next);
     }
-    store.setVisibility(Object.keys(next).length ? next : undefined);
     onClose();
     notify("显示隐藏条件已更新", "success");
   }
 
   return (
     <ModalShell
-      title={target.kind === "hide" ? "配置隐藏条件" : "配置显示条件"}
+      title="配置显示 / 隐藏条件"
       width="680px"
       onClose={onClose}
       footer={
@@ -150,7 +160,10 @@ export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
           <button
             type="button"
             className="cond__clear"
-            onClick={() => setDraft({ mode: "and", rows: [blankRow()], expression: "" })}
+            onClick={() => {
+              setDraft({ mode: "and", rows: [blankRow()], expression: "" });
+              setAction("show");
+            }}
           >
             清空
           </button>
@@ -165,9 +178,24 @@ export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
       }
     >
       <div className="cond__hint">
-        命中「显示」条件时一定显示（优先于隐藏）；否则命中「隐藏」条件时隐藏。
+        条件命中执行下方「命中时动作」，未命中则执行相反动作——始终有明确结果，无中间态。
         <br />
         {scopeTip}
+      </div>
+
+      <div className="cond__section">命中时动作</div>
+      <div className="cond__modes">
+        {VISIBILITY_ACTIONS.map((option) => (
+          <button
+            type="button"
+            key={option.value}
+            className={`cond__mode${action === option.value ? " is-active" : ""}`}
+            title={option.hint}
+            onClick={() => setAction(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
       </div>
 
       <div className="cond__section">条件间关系</div>

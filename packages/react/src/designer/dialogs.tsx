@@ -45,11 +45,10 @@ export interface ExternalTarget {
   label: string;
 }
 
-/** 条件配置的落点：哪个节点的显示条件或隐藏条件 */
+/** 条件配置的落点：哪个节点（1.3.0 起单组配置，不再区分 show / hide） */
 export interface ConditionTarget {
   nodeId: string;
   label: string;
-  kind: "show" | "hide";
 }
 
 /** 数据计算的落点：哪个文字 / 数字元素要自动回填结果 */
