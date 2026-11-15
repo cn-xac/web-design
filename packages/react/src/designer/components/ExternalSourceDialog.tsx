@@ -21,6 +21,7 @@ import type {
   Method,
 } from "@x-ac/web-design-core";
 import {
+  bareKey,
   canOwnExternalSource,
   collectBindableElements,
   findLocation,
@@ -59,6 +60,8 @@ interface DraftResponse {
   parentField: string;
   /** 子映射（响应目标为子表单时）：响应行内各字段 → 子表单字段 */
   subMaps: ExternalSubMap[];
+  /** 输入框目标：多条数据额外生成候选下拉（值映射仍只取第一条） */
+  useCandidates: boolean;
   /** 当前推断形态：选项类目标 → select，否则 form */
   shape: DataShape;
 }
@@ -85,6 +88,7 @@ const emptyResponse = (): DraftResponse => ({
   display: "",
   parentField: "",
   subMaps: [],
+  useCandidates: false,
   shape: "form",
 });
 
@@ -111,17 +115,30 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
 
   const [initial] = useState(() => {
     const source = currentSource();
-    const responses = responsesOf(source).map((item) => ({
-      targetNodeId: "",
-      scopePath: item.scopePath,
-      listField: item.listField ?? "",
-      labelField: item.labelField ?? "",
-      valueField: item.valueField ?? "",
-      display: item.display ?? "",
-      parentField: item.parentField ?? "",
-      subMaps: (item.subMaps ?? []).map((map) => ({ ...map })),
-      shape: (item.shape ?? "form") as DataShape,
-    }));
+    const saved = responsesOf(source);
+    // 候选下拉生成的 options.<id> 映射不单独占卡片，回落成对应 form 映射上的开关
+    const candidateIds = new Set(
+      saved
+        .filter((item) => item.shape === "select" && /^options\.(.+)$/.test(item.scopePath))
+        .map((item) => /^options\.(.+)$/.exec(item.scopePath)![1]!),
+    );
+    const responses = saved
+      .filter((item) => {
+        const match = /^options\.(.+)$/.exec(item.scopePath);
+        return !(item.shape === "select" && match && candidateIds.has(match[1]!));
+      })
+      .map((item) => ({
+        targetNodeId: "",
+        scopePath: item.scopePath,
+        listField: item.listField ?? "",
+        labelField: item.labelField ?? "",
+        valueField: item.valueField ?? "",
+        display: item.display ?? "",
+        parentField: item.parentField ?? "",
+        subMaps: (item.subMaps ?? []).map((map) => ({ ...map })),
+        useCandidates: false,
+        shape: (item.shape ?? "form") as DataShape,
+      }));
 
     const draft: Draft = {
       name: source?.name ?? "",
@@ -140,6 +157,7 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
       if (!element) continue;
       resp.targetNodeId = element.nodeId;
       resp.shape = element.isOption ? "select" : "form";
+      if (candidateIds.has(element.nodeId)) resp.useCandidates = true;
       if (element.isOption) {
         resp.labelField = resp.labelField || "label";
         resp.valueField = resp.valueField || "value";
@@ -174,6 +192,12 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
   const isValueTarget = (resp: DraftResponse): boolean => {
     const element = elementByNodeId(resp.targetNodeId);
     return Boolean(element && (element.isFormControl || element.isOption));
+  };
+
+  /** 目标是否为「输入框」：core 里只有 input 物料带 options 字段，能消费候选项 */
+  const isInputTarget = (resp: DraftResponse): boolean => {
+    const element = elementByNodeId(resp.targetNodeId);
+    return Boolean(element && !element.isOption && !element.isGroup && bareKey(element.component) === "input");
   };
 
   /** 目标是否为子表单（明细容器）—— 这类目标才需要「父字段名 + 子映射」 */
@@ -218,6 +242,11 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
     if (isValueTarget(resp)) {
       parts.push(
         "「显示内容」支持用 {{}} 从响应数据取数并自由拼接（如 {{data.a}}/{{data.b}}）；下拉逐项渲染，输入框把整段响应渲染成字符串。",
+      );
+    }
+    if (isInputTarget(resp) && resp.useCandidates) {
+      parts.push(
+        "已开启候选下拉：同一份响应额外生成 options.<节点ID> 的候选项，点选一条即回填显示内容；值映射仍只取第一条。",
       );
     }
     if (!resp.targetNodeId) {
@@ -289,6 +318,8 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
       // 目标是子表单 → 给父字段名默认值；换成别的目标则清掉子映射
       next.parentField = element.isGroup ? defaultParentField(element.path) : "";
       if (!element.isGroup) next.subMaps = [];
+      // 换成非输入框目标时关掉候选开关，避免生成无人消费的 options 映射
+      if (!isInputTarget({ ...resp, ...next } as DraftResponse)) next.useCandidates = false;
     }
     patchResponse(index, next);
   };
@@ -325,14 +356,21 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
 
   /* ---------------- 保存 / 移除 ---------------- */
 
-  /** 找出「选项类目标」对应的节点：它的 options 要绑到结果路径 */
-  const optionNodeIdsOf = (responses: ExternalResponseMap[]): string[] => {
-    const ids: string[] = [];
-    for (const resp of responses) {
+  /** 自动绑定到节点 options 的映射：选项类目标写元素路径，候选下拉写 options.<节点ID> */
+  const autoOptionBindings = (source: ExternalDataSource | undefined): Map<string, string> => {
+    const out = new Map<string, string>();
+    for (const resp of responsesOf(source)) {
       const element = elements.find((item) => item.path === resp.scopePath && item.isOption);
-      if (element) ids.push(element.nodeId);
+      if (element) out.set(element.nodeId, `{{${resp.scopePath}}}`);
+      const match = /^options\.(.+)$/.exec(resp.scopePath);
+      if (resp.shape === "select" && match) {
+        const id = match[1]!;
+        if (elements.some((item) => item.nodeId === id && !item.isOption)) {
+          out.set(id, `{{${resp.scopePath}}}`);
+        }
+      }
     }
-    return ids;
+    return out;
   };
 
   const buildSource = (): ExternalDataSource => {
@@ -349,27 +387,39 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
       source.params = params.map((item) => ({ key: item.key.trim(), path: item.path, label: item.label }));
     }
 
-    const responses = draft.responses
-      .filter((resp) => resp.scopePath.trim())
-      .map((resp): ExternalResponseMap => {
-        const out: ExternalResponseMap = { scopePath: resp.scopePath.trim() };
-        const element = elementByNodeId(resp.targetNodeId);
-        if (element?.isOption) {
-          // 选项类：恒为选项形态；value 不配则运行时回退到 label
-          out.shape = "select";
-          out.labelField = resp.labelField.trim() || "label";
-          out.valueField = resp.valueField.trim();
-        }
-        if (resp.listField.trim()) out.listField = resp.listField.trim();
-        // 显示内容模板：只对「可输入 / 下拉」目标有意义
-        if (resp.display.trim()) out.display = resp.display.trim();
-        // 父字段名 + 子映射：只对子表单目标有意义
-        if (resp.parentField.trim()) out.parentField = resp.parentField.trim();
-        if (resp.subMaps.length) {
-          out.subMaps = resp.subMaps.map((map) => ({ field: map.field, from: map.from }));
-        }
-        return out;
-      });
+    const responses: ExternalResponseMap[] = [];
+    for (const resp of draft.responses.filter((item) => item.scopePath.trim())) {
+      const out: ExternalResponseMap = { scopePath: resp.scopePath.trim() };
+      const element = elementByNodeId(resp.targetNodeId);
+      if (element?.isOption) {
+        // 选项类：恒为选项形态；value 不配则运行时回退到 label
+        out.shape = "select";
+        out.labelField = resp.labelField.trim() || "label";
+        out.valueField = resp.valueField.trim();
+      }
+      if (resp.listField.trim()) out.listField = resp.listField.trim();
+      // 显示内容模板：只对「可输入 / 下拉」目标有意义
+      if (resp.display.trim()) out.display = resp.display.trim();
+      // 父字段名 + 子映射：只对子表单目标有意义
+      if (resp.parentField.trim()) out.parentField = resp.parentField.trim();
+      if (resp.subMaps.length) {
+        out.subMaps = resp.subMaps.map((map) => ({ field: map.field, from: map.from }));
+      }
+      responses.push(out);
+
+      // 候选下拉：同一份响应再生成一条 select 映射，逐项渲染成 options.<节点ID>
+      if (resp.useCandidates && isInputTarget(resp)) {
+        const candidate: ExternalResponseMap = {
+          scopePath: `options.${resp.targetNodeId}`,
+          shape: "select",
+          labelField: resp.labelField.trim() || "label",
+          valueField: resp.valueField.trim() || "value",
+        };
+        if (resp.listField.trim()) candidate.listField = resp.listField.trim();
+        if (resp.display.trim()) candidate.display = resp.display.trim();
+        responses.push(candidate);
+      }
+    }
     if (responses.length) source.responses = responses;
 
     source.once = draft.once;
@@ -382,31 +432,33 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
       notify("请填写请求地址", "error");
       return;
     }
+    // 候选项靠「显示内容」模板逐项生成展示文本，没模板就没有可点的文字
+    if (draft.responses.some((resp) => resp.useCandidates && isInputTarget(resp) && !resp.display.trim())) {
+      notify("开启候选下拉时请填写「显示内容」，候选项靠它生成展示文本", "error");
+      return;
+    }
 
-    const prevIds = optionNodeIdsOf(responsesOf(currentSource()));
+    const prev = autoOptionBindings(currentSource());
     const source = buildSource();
     store.upsertExternalSource(source);
     store.setNodeExternalRef(target.nodeId, source.id);
 
-    // 选项类目标的 options 绑到结果路径；曾被绑定但本次不再绑定的要清掉，避免悬空引用
-    const newIds = optionNodeIdsOf(source.responses ?? []);
-    for (const id of prevIds) {
-      if (!newIds.includes(id)) store.updateNodeProp(id, "options", "");
+    // 选项类 / 候选下拉的 options 自动绑定到结果路径；不再绑定的要清掉
+    const next = autoOptionBindings(source);
+    for (const id of prev.keys()) {
+      if (!next.has(id)) store.updateNodeProp(id, "options", "");
     }
-    for (const id of newIds) {
-      const scopePath = elementByNodeId(id)?.path;
-      if (scopePath) store.updateNodeProp(id, "options", `{{${scopePath}}}`);
-    }
+    for (const [id, expr] of next) store.updateNodeProp(id, "options", expr);
 
     onClose();
     notify("外部数据源已保存", "success");
   };
 
   const remove = (): void => {
-    const prevIds = optionNodeIdsOf(responsesOf(currentSource()));
+    const prev = autoOptionBindings(currentSource());
     store.removeExternalSource(sourceId);
     store.setNodeExternalRef(target.nodeId, undefined);
-    for (const id of prevIds) store.updateNodeProp(id, "options", "");
+    for (const id of prev.keys()) store.updateNodeProp(id, "options", "");
     onClose();
     notify("已移除外部数据源", "success");
   };
@@ -649,6 +701,16 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
                     onChange={(event) => patchResponse(index, { display: event.target.value })}
                   />
                 </div>
+              ) : null}
+              {isInputTarget(resp) ? (
+                <label className="ext__switch ext__cand">
+                  <input
+                    type="checkbox"
+                    checked={resp.useCandidates}
+                    onChange={(event) => patchResponse(index, { useCandidates: event.target.checked })}
+                  />
+                  <span>多条数据以下拉候选展示（点选一条回填输入框）</span>
+                </label>
               ) : null}
             </div>
           ))}

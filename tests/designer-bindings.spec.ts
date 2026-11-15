@@ -511,3 +511,93 @@ describe("设计器：外部数据源弹窗交互修正", () => {
 
 // 这三个用例吃的是扩展仓的专有物料（ec-tree-select / ec-transfer），
 // CI 干净环境没有兄弟仓 EP 适配包，属性面板里不会有 optionPair 字段 → 整块跳过。
+
+describe("设计器：输入框的多条数据以候选下拉展示", () => {
+  async function openDialog() {
+    const mounted = await mountWithNode({
+      id: "i1",
+      component: "input",
+      props: { label: "姓名" },
+    });
+    await mounted.wrapper.find(".props__ext").trigger("click");
+    await tick();
+    return mounted;
+  }
+
+  async function addResponse(wrapper: Awaited<ReturnType<typeof openDialog>>["wrapper"]) {
+    const btn = wrapper
+      .findAll(".ext__ghost--block")
+      .find((item) => item.text().includes("添加响应映射"));
+    expect(btn).toBeTruthy();
+    await btn!.trigger("click");
+    await tick();
+  }
+
+  it("输入框目标显示候选开关，默认关闭", async () => {
+    const { wrapper } = await openDialog();
+    await addResponse(wrapper);
+
+    const sw = wrapper.find(".ext__cand input");
+    expect(sw.exists()).toBe(true);
+    expect((sw.element as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("勾选后保存：生成「值 + 候选」两条映射，节点 options 自动绑定候选路径", async () => {
+    const { wrapper, store } = await openDialog();
+    await wrapper.find('input[placeholder="/api/dept/list"]').setValue("/api/rows");
+    await addResponse(wrapper);
+
+    const display = wrapper
+      .findAll(".ext__resp input")
+      .find((item) => (item.attributes("placeholder") ?? "").includes("{{data.name}}"));
+    expect(display).toBeTruthy();
+    await display!.setValue("{{name}}");
+    await wrapper.find(".ext__cand input").setValue(true);
+    await wrapper.find(".ext__ok").trigger("click");
+    await tick();
+
+    const node = store.page.children[0];
+    const source = store.page.externalSources?.[node.externalRef ?? ""];
+    expect(source?.responses).toHaveLength(2);
+    // 值映射：写进输入框自身的绑定路径，只取第一条
+    expect(source?.responses?.[0]).toMatchObject({
+      scopePath: "form.i1",
+      display: "{{name}}",
+    });
+    // 候选映射：逐项渲染成选项数组
+    expect(source?.responses?.[1]).toMatchObject({
+      scopePath: "options.i1",
+      shape: "select",
+      display: "{{name}}",
+    });
+    expect(node.props?.options).toBe("{{options.i1}}");
+  });
+
+  it("再次打开时候选映射回落成开关；取消勾选后清理绑定", async () => {
+    const { wrapper, store } = await openDialog();
+    await wrapper.find('input[placeholder="/api/dept/list"]').setValue("/api/rows");
+    await addResponse(wrapper);
+    const display = wrapper
+      .findAll(".ext__resp input")
+      .find((item) => (item.attributes("placeholder") ?? "").includes("{{data.name}}"));
+    await display!.setValue("{{name}}");
+    await wrapper.find(".ext__cand input").setValue(true);
+    await wrapper.find(".ext__ok").trigger("click");
+    await tick();
+
+    // 重新打开：两条映射应回落成一张卡片上的开关
+    await wrapper.find(".props__ext").trigger("click");
+    await tick();
+    expect(wrapper.findAll(".ext__resp")).toHaveLength(1);
+    expect((wrapper.find(".ext__cand input").element as HTMLInputElement).checked).toBe(true);
+
+    await wrapper.find(".ext__cand input").setValue(false);
+    await wrapper.find(".ext__ok").trigger("click");
+    await tick();
+
+    const node = store.page.children[0];
+    const source = store.page.externalSources?.[node.externalRef ?? ""];
+    expect(source?.responses).toHaveLength(1);
+    expect(node.props?.options).toBe("");
+  });
+});

@@ -252,9 +252,16 @@ function normalizeResponse(
     return normalize(binding, raw, { scope });
   }
 
-  // 表单形态：模板渲染整段响应
+  // 表单形态：模板渲染「一段」响应。
+  // 数组响应只取第一条（listField 可先提取数组），否则多条数据下模板取不到任何字段、结果为空串。
   if ((binding.shape ?? "form") === "form") {
-    return renderDisplay(template, raw, scope);
+    let target: unknown = raw;
+    if (binding.listField && raw && typeof raw === "object") {
+      const extracted = getByPath(raw as Record<string, unknown>, binding.listField);
+      if (extracted !== undefined) target = extracted;
+    }
+    if (Array.isArray(target)) target = target[0] ?? {};
+    return renderDisplay(template, target, scope);
   }
 
   // 选项形态：逐项渲染，值仍按 label/value 字段映射

@@ -12,13 +12,16 @@
  * 配置写在页面级 page.externalSources，本元素通过 externalRef 引用它：
  * 触发元素固定为「打开弹窗时点击的那个元素」，弹窗不再提供触发元素选择。
  *
- * 仅选项类目标会在保存时把它的 options 绑到结果路径（取数与 label/value 映射都归本弹窗管）。
+ * 选项类目标会在保存时把它的 options 绑到结果路径（取数与 label/value 映射都归本弹窗管）；
+ * 输入框目标可开启「多条数据以下拉候选展示」：额外生成一条 select 映射写到 options.<节点ID>，
+ * 值仍由原 form 映射写进元素自身的绑定路径。
  */
 import { computed, reactive, ref, watch } from "vue";
 import type { DataShape, ExternalDataSource, ExternalResponseMap, ExternalSubMap } from "@x-ac/web-design-core";
 import {
   canOwnExternalSource,
   collectBindableElements,
+  bareKey,
   findLocation,
   responsesOf,
   type BindableElement,
@@ -67,6 +70,8 @@ interface DraftResponse {
   parentField: string;
   /** 子映射（响应目标为子表单时）：响应行内各字段 → 子表单字段 */
   subMaps: ExternalSubMap[];
+  /** 输入框目标：多条数据额外生成候选下拉（值映射仍只取第一条） */
+  useCandidates: boolean;
   /** 当前推断形态：选项类目标 → select，否则 form */
   shape: DataShape;
 }
@@ -149,6 +154,12 @@ function isValueTarget(resp: DraftResponse): boolean {
   return Boolean(el && (el.isFormControl || el.isOption));
 }
 
+/** 目标是否为「输入框」：core 里只有 input 物料带 options 字段，能消费候选项 */
+function isInputTarget(resp: DraftResponse): boolean {
+  const el = elementByNodeId(resp.targetNodeId);
+  return Boolean(el && !el.isOption && !el.isGroup && bareKey(el.component) === "input");
+}
+
 /** 目标是否为子表单（明细容器）—— 这类目标才需要「父字段名 + 子映射」（#4） */
 function isGroupTarget(resp: DraftResponse): boolean {
   return Boolean(elementByNodeId(resp.targetNodeId)?.isGroup);
@@ -177,6 +188,11 @@ function tipOf(resp: DraftResponse): string {
       "「显示内容」支持用 {{}} 从响应数据取数并自由拼接（如 {{data.a}}/{{data.b}}）；下拉逐项渲染，输入框把整段响应渲染成字符串。",
     );
   }
+  if (isInputTarget(resp) && resp.useCandidates) {
+    parts.push(
+      "已开启候选下拉：同一份响应额外生成 options.<节点ID> 的候选项，点选一条即回填显示内容；值映射仍只取第一条。",
+    );
+  }
   if (!resp.targetNodeId) {
     parts.push(`未选目标元素：结果整体写入 ${resp.scopePath}，由你自行把某元素属性绑到该路径。`);
   } else if (!isOptionTarget(resp)) {
@@ -201,6 +217,13 @@ function defaultScopePath(): string {
 
 function reset(): void {
   const source = currentSource();
+  const saved = responsesOf(source);
+  // 候选下拉生成的 options.<id> 映射不单独占一张卡片，回落成对应 form 映射上的开关
+  const candidateIds = new Set(
+    saved
+      .filter((r) => r.shape === "select" && /^options\.(.+)$/.test(r.scopePath))
+      .map((r) => /^options\.(.+)$/.exec(r.scopePath)![1]!),
+  );
   currentSourceId.value = source?.id ?? genSourceId();
   Object.assign(draft, {
     name: source?.name ?? "",
@@ -210,17 +233,23 @@ function reset(): void {
     once: source?.once !== false,
     triggerLength: Number(source?.triggerLength ?? 0),
     params: (source?.params ?? []).map((item) => ({ ...item })),
-    responses: responsesOf(source).map((r) => ({
-      targetNodeId: "",
-      scopePath: r.scopePath,
-      listField: r.listField ?? "",
-      labelField: r.labelField ?? "",
-      valueField: r.valueField ?? "",
-      display: r.display ?? "",
-      parentField: r.parentField ?? "",
-      subMaps: (r.subMaps ?? []).map((m) => ({ ...m })),
-      shape: r.shape ?? "form",
-    })),
+    responses: saved
+      .filter((r) => {
+        const match = /^options\.(.+)$/.exec(r.scopePath);
+        return !(r.shape === "select" && match && candidateIds.has(match[1]!));
+      })
+      .map((r) => ({
+        targetNodeId: "",
+        scopePath: r.scopePath,
+        listField: r.listField ?? "",
+        labelField: r.labelField ?? "",
+        valueField: r.valueField ?? "",
+        display: r.display ?? "",
+        parentField: r.parentField ?? "",
+        subMaps: (r.subMaps ?? []).map((m) => ({ ...m })),
+        useCandidates: false,
+        shape: r.shape ?? "form",
+      })),
   });
   // 反查每个响应命中的目标节点（scopePath === 某元素路径）
   for (const resp of draft.responses) {
@@ -228,6 +257,7 @@ function reset(): void {
     if (el) {
       resp.targetNodeId = el.nodeId;
       resp.shape = el.isOption ? "select" : "form";
+      if (candidateIds.has(el.nodeId)) resp.useCandidates = true;
       if (el.isOption) {
         resp.labelField = resp.labelField || "label";
         resp.valueField = resp.valueField || "value";
@@ -280,6 +310,7 @@ function addResponse(): void {
     display: "",
     parentField: "",
     subMaps: [],
+    useCandidates: false,
     shape: "form",
   };
   // 只有一个「可输入 / 下拉」元素时默认选中目标，省去一次手动选择（#3）
@@ -313,6 +344,8 @@ function onResponseTarget(index: number, nodeId: string): void {
     // 目标是子表单 → 给父字段名默认值；换成别的目标则清掉子映射
     resp.parentField = el.isGroup ? defaultParentField(el) : "";
     if (!el.isGroup) resp.subMaps = [];
+    // 换成非输入框目标时关掉候选开关，避免生成无人消费的 options 映射
+    if (!isInputTarget(resp)) resp.useCandidates = false;
   }
 }
 
@@ -351,14 +384,26 @@ async function openHeaders(): Promise<void> {
 
 /* ---------------- 保存 / 移除 ---------------- */
 
-/** 找出「选项类目标」对应的节点：它的 options 要绑到结果路径 */
-function optionNodeIdsOf(responses: ExternalResponseMap[]): string[] {
-  const ids: string[] = [];
-  for (const r of responses) {
+/**
+ * 自动绑定到节点 options 的映射，返回「节点ID → 绑定表达式」：
+ * - 选项类目标：结果直接写在该元素的绑定路径上；
+ * - 候选下拉：结果额外写在 options.<节点ID>，由输入框消费成可点选的下拉。
+ * 保存时据此整体覆盖，移除 / 关闭时据此清理，避免留下悬空引用。
+ */
+function autoOptionBindings(source: ExternalDataSource | undefined): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const r of responsesOf(source)) {
     const el = elements.value.find((e) => e.path === r.scopePath && e.isOption);
-    if (el) ids.push(el.nodeId);
+    if (el) out.set(el.nodeId, `{{${r.scopePath}}}`);
+    const match = /^options\.(.+)$/.exec(r.scopePath);
+    if (r.shape === "select" && match) {
+      const id = match[1]!;
+      if (elements.value.some((e) => e.nodeId === id && !e.isOption)) {
+        out.set(id, `{{${r.scopePath}}}`);
+      }
+    }
   }
-  return ids;
+  return out;
 }
 
 function buildSource(): ExternalDataSource {
@@ -375,27 +420,40 @@ function buildSource(): ExternalDataSource {
     source.params = params.map((item) => ({ key: item.key.trim(), path: item.path, label: item.label }));
   }
 
-  const responses = draft.responses
-    .filter((r) => r.scopePath.trim())
-    .map((r): ExternalResponseMap => {
-      const out: ExternalResponseMap = { scopePath: r.scopePath.trim() };
-      const el = elementByNodeId(r.targetNodeId);
-      if (el?.isOption) {
-        // 选项类：恒为选项形态；value 不配则运行时回退到 label（#5）
-        out.shape = "select";
-        out.labelField = r.labelField.trim() || "label";
-        out.valueField = r.valueField.trim();
-      }
-      if (r.listField.trim()) out.listField = r.listField.trim();
-      // 显示内容模板：只对「可输入 / 下拉」目标有意义（#3）
-      if (r.display.trim()) out.display = r.display.trim();
-      // 父字段名 + 子映射：只对子表单目标有意义（#4）
-      if (r.parentField.trim()) out.parentField = r.parentField.trim();
-      if (r.subMaps.length) {
-        out.subMaps = r.subMaps.map((m) => ({ field: m.field, from: m.from }));
-      }
-      return out;
-    });
+  const responses: ExternalResponseMap[] = [];
+  for (const r of draft.responses.filter((item) => item.scopePath.trim())) {
+    const out: ExternalResponseMap = { scopePath: r.scopePath.trim() };
+    const el = elementByNodeId(r.targetNodeId);
+    if (el?.isOption) {
+      // 选项类：恒为选项形态；value 不配则运行时回退到 label（#5）
+      out.shape = "select";
+      out.labelField = r.labelField.trim() || "label";
+      out.valueField = r.valueField.trim();
+    }
+    if (r.listField.trim()) out.listField = r.listField.trim();
+    // 显示内容模板：只对「可输入 / 下拉」目标有意义（#3）
+    if (r.display.trim()) out.display = r.display.trim();
+    // 父字段名 + 子映射：只对子表单目标有意义（#4）
+    if (r.parentField.trim()) out.parentField = r.parentField.trim();
+    if (r.subMaps.length) {
+      out.subMaps = r.subMaps.map((m) => ({ field: m.field, from: m.from }));
+    }
+    responses.push(out);
+
+    // 候选下拉：同一份响应再生成一条 select 映射，逐项渲染成 options.<节点ID>。
+    // 值映射（上面这条）仍只写第一条，输入框点选候选后回填显示文本。
+    if (r.useCandidates && isInputTarget(r)) {
+      const candidate: ExternalResponseMap = {
+        scopePath: `options.${r.targetNodeId}`,
+        shape: "select",
+        labelField: r.labelField.trim() || "label",
+        valueField: r.valueField.trim() || "value",
+      };
+      if (r.listField.trim()) candidate.listField = r.listField.trim();
+      if (r.display.trim()) candidate.display = r.display.trim();
+      responses.push(candidate);
+    }
+  }
   if (responses.length) source.responses = responses;
 
   source.once = draft.once;
@@ -412,21 +470,23 @@ function save(): void {
     notify("请填写请求地址", "error");
     return;
   }
+  // 候选项靠「显示内容」模板逐项生成展示文本，没模板就没有可点的文字
+  if (draft.responses.some((r) => r.useCandidates && isInputTarget(r) && !r.display.trim())) {
+    notify("开启候选下拉时请填写「显示内容」，候选项靠它生成展示文本", "error");
+    return;
+  }
 
-  const prevIds = optionNodeIdsOf(responsesOf(currentSource()));
+  const prev = autoOptionBindings(currentSource());
   const source = buildSource();
   store.upsertExternalSource(source);
   store.setNodeExternalRef(target.nodeId, source.id);
 
-  // 选项类目标的 options 绑到结果路径；曾被绑定但本次不再绑定的要清掉，避免悬空引用
-  const newIds = optionNodeIdsOf(source.responses ?? []);
-  for (const id of prevIds) {
-    if (!newIds.includes(id)) store.updateNodeProp(id, "options", "");
+  // 选项类 / 候选下拉的 options 自动绑定到结果路径；不再绑定的要清掉，避免悬空引用
+  const next = autoOptionBindings(source);
+  for (const id of prev.keys()) {
+    if (!next.has(id)) store.updateNodeProp(id, "options", "");
   }
-  for (const id of newIds) {
-    const scopePath = elementByNodeId(id)?.path;
-    if (scopePath) store.updateNodeProp(id, "options", `{{${scopePath}}}`);
-  }
+  for (const [id, expr] of next) store.updateNodeProp(id, "options", expr);
 
   dialog.close();
   notify("外部数据源已保存", "success");
@@ -435,10 +495,10 @@ function save(): void {
 function remove(): void {
   const target = dialog.target.value;
   if (!target) return;
-  const prevIds = optionNodeIdsOf(responsesOf(currentSource()));
+  const prev = autoOptionBindings(currentSource());
   store.removeExternalSource(currentSourceId.value);
   store.setNodeExternalRef(target.nodeId, undefined);
-  for (const id of prevIds) store.updateNodeProp(id, "options", "");
+  for (const id of prev.keys()) store.updateNodeProp(id, "options", "");
   dialog.close();
   notify("已移除外部数据源", "success");
 }
@@ -592,6 +652,11 @@ function remove(): void {
               spellcheck="false"
             />
           </div>
+          <!-- 输入框专属：接口返回多条时，额外生成候选下拉（值映射仍只取第一条） -->
+          <label v-if="isInputTarget(resp)" class="ext__switch ext__cand">
+            <input v-model="resp.useCandidates" type="checkbox" />
+            <span>多条数据以下拉候选展示（点选一条回填输入框）</span>
+          </label>
         </div>
         <button type="button" class="ext__ghost ext__ghost--block" @click="addResponse">+ 添加响应映射</button>
       </div>

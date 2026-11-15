@@ -314,6 +314,12 @@ const MATERIALS_RAW: Material[] = [
       { key: "label", label: "标签", type: "text" },
       { key: "placeholder", label: "占位提示", type: "text" },
       { key: "modelValue", label: "数据绑定", type: "text", tip: "如 {{form.name}}" },
+      {
+        key: "options",
+        label: "候选选项",
+        type: "optionPair",
+        tip: "配了候选就变成可点选的输入框；也可直接用「选项数据源」从接口取多条",
+      },
       { key: "clearable", label: "可清空", type: "boolean" },
       { key: "disabled", label: "禁用", type: "boolean" },
     ],

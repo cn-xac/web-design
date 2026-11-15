@@ -504,3 +504,45 @@ describe("React 设计器：问号提示浮层", () => {
     }
   });
 });
+
+describe("React 设计器：输入框的多条数据以候选下拉展示", () => {
+  it("勾选候选开关后保存：生成「值 + 候选」两条映射，options 自动绑定", async () => {
+    const ui = setup(pageWith([{ id: "i1", component: "input", props: { label: "姓名" } }]));
+    try {
+      await ui.render();
+      await ui.select("i1");
+      await click(ui.container.querySelector(".props__ext"));
+
+      await typeInto(
+        ui.container.querySelector('input[placeholder="/api/dept/list"]') as HTMLInputElement,
+        "/api/rows",
+      );
+      await click(byText(ui.container, "button", "添加响应映射"));
+
+      const display = [
+        ...ui.container.querySelectorAll<HTMLInputElement>(".ext__resp input"),
+      ].find((item) => (item.getAttribute("placeholder") ?? "").includes("{{data.name}}"));
+      expect(display).toBeTruthy();
+      await typeInto(display!, "{{name}}");
+
+      const sw = ui.container.querySelector<HTMLInputElement>(".ext__cand input");
+      expect(sw).toBeTruthy();
+      await click(sw);
+
+      await click(ui.container.querySelector(".ext__ok"));
+
+      const node = ui.nodeOf("i1");
+      const source = ui.schema().externalSources?.[node!.externalRef!];
+      expect(source?.responses).toHaveLength(2);
+      expect(source?.responses?.[0]).toMatchObject({ scopePath: "form.i1", display: "{{name}}" });
+      expect(source?.responses?.[1]).toMatchObject({
+        scopePath: "options.i1",
+        shape: "select",
+        display: "{{name}}",
+      });
+      expect(node?.props?.options).toBe("{{options.i1}}");
+    } finally {
+      await ui.cleanup();
+    }
+  });
+});

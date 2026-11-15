@@ -482,3 +482,157 @@ describe("子映射（#4）", () => {
     expect(scope.form).toEqual({ items: [{ goodsName: "A" }] });
   });
 });
+
+describe("输入框目标：多条响应收敛成单值（候选下拉配套）", () => {
+  it("响应本身就是数组时，display 模板渲染第一条", async () => {
+    setDefaultRequest(
+      createRequest({
+        defaults: {
+          fetchImpl: fakeFetch(() => mockResponse([{ name: "张三" }, { name: "李四" }])),
+        },
+      }),
+    );
+    const scope: Record<string, unknown> = {};
+    await loadExternalSource(
+      source({ responses: [{ scopePath: "form.i1", shape: "form", display: "{{data.name}}" }] }),
+      scope,
+    );
+    expect((scope.form as Record<string, unknown>).i1).toBe("张三");
+  });
+
+  it("配了 listField 时先提取数组，再取第一条", async () => {
+    setDefaultRequest(
+      createRequest({
+        defaults: {
+          fetchImpl: fakeFetch(() =>
+            mockResponse({ rows: [{ name: "张三" }, { name: "李四" }] }),
+          ),
+        },
+      }),
+    );
+    const scope: Record<string, unknown> = {};
+    await loadExternalSource(
+      source({
+        responses: [
+          { scopePath: "form.i1", shape: "form", listField: "rows", display: "{{name}}" },
+        ],
+      }),
+      scope,
+    );
+    expect((scope.form as Record<string, unknown>).i1).toBe("张三");
+  });
+
+  it("值映射与候选映射共用一次请求：前者出单值，后者出全部选项", async () => {
+    let calls = 0;
+    setDefaultRequest(
+      createRequest({
+        defaults: {
+          fetchImpl: fakeFetch(() => {
+            calls += 1;
+            return mockResponse({ rows: [{ id: 1, name: "张三" }, { id: 2, name: "李四" }] });
+          }),
+        },
+      }),
+    );
+    const scope: Record<string, unknown> = {};
+    await loadExternalSource(
+      source({
+        responses: [
+          { scopePath: "form.i1", shape: "form", listField: "rows", display: "{{name}}" },
+          {
+            scopePath: "options.i1",
+            shape: "select",
+            listField: "rows",
+            labelField: "name",
+            valueField: "id",
+            display: "{{data.name}}",
+          },
+        ],
+      }),
+      scope,
+    );
+    expect(calls).toBe(1);
+    expect((scope.form as Record<string, unknown>).i1).toBe("张三");
+    expect((scope.options as Record<string, unknown>).i1).toEqual([
+      { label: "张三", value: "1" },
+      { label: "李四", value: "2" },
+    ]);
+  });
+});
+
+describe("输入框目标：多条响应收敛成单值（候选下拉配套）", () => {
+  it("响应本身就是数组时，display 模板渲染第一条", async () => {
+    setDefaultRequest(
+      createRequest({
+        defaults: {
+          fetchImpl: fakeFetch(() => mockResponse([{ name: "张三" }, { name: "李四" }])),
+        },
+      }),
+    );
+    const scope: Record<string, unknown> = {};
+    await loadExternalSource(
+      source({ responses: [{ scopePath: "form.i1", shape: "form", display: "{{data.name}}" }] }),
+      scope,
+    );
+    expect((scope.form as Record<string, unknown>).i1).toBe("张三");
+  });
+
+  it("配了 listField 时先提取数组，再取第一条", async () => {
+    setDefaultRequest(
+      createRequest({
+        defaults: {
+          fetchImpl: fakeFetch(() =>
+            mockResponse({ rows: [{ name: "张三" }, { name: "李四" }] }),
+          ),
+        },
+      }),
+    );
+    const scope: Record<string, unknown> = {};
+    await loadExternalSource(
+      source({
+        responses: [
+          { scopePath: "form.i1", shape: "form", listField: "rows", display: "{{name}}" },
+        ],
+      }),
+      scope,
+    );
+    expect((scope.form as Record<string, unknown>).i1).toBe("张三");
+  });
+
+  it("值映射与候选映射共用一次请求：前者出单值，后者出全部选项", async () => {
+    let calls = 0;
+    setDefaultRequest(
+      createRequest({
+        defaults: {
+          fetchImpl: fakeFetch(() => {
+            calls += 1;
+            return mockResponse({ rows: [{ id: 1, name: "张三" }, { id: 2, name: "李四" }] });
+          }),
+        },
+      }),
+    );
+    const scope: Record<string, unknown> = {};
+    await loadExternalSource(
+      source({
+        responses: [
+          { scopePath: "form.i1", shape: "form", listField: "rows", display: "{{name}}" },
+          {
+            scopePath: "options.i1",
+            shape: "select",
+            listField: "rows",
+            labelField: "name",
+            valueField: "id",
+            display: "{{data.name}}",
+          },
+        ],
+      }),
+      scope,
+    );
+    expect(calls).toBe(1);
+    expect((scope.form as Record<string, unknown>).i1).toBe("张三");
+    expect((scope.options as Record<string, unknown>).i1).toEqual([
+      { label: "张三", value: "1" },
+      { label: "李四", value: "2" },
+    ]);
+  });
+});
