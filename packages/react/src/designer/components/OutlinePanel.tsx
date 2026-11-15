@@ -288,15 +288,22 @@ export function OutlinePanel() {
                     onMouseEnter={() => store.hover(item.nodeId)}
                     onMouseLeave={() => store.hover(null)}
                   >
-                    <span className="oset__name" title={item.label}>
-                      {item.label}
-                    </span>
-                    <span className="oset__flags">
-                      {item.flags.external ? <span className="oset__flag oset__flag--ext" title="外部数据源">源</span> : null}
-                      {item.flags.visibility ? <span className="oset__flag oset__flag--vis" title="显示 / 隐藏">隐</span> : null}
-                      {item.flags.rules ? <span className="oset__flag oset__flag--rule" title="数据校验">验</span> : null}
-                      {item.flags.events ? <span className="oset__flag oset__flag--evt" title="事件">事</span> : null}
-                    </span>
+                    <div className="oset__main">
+                      <span className="oset__name" title={item.label}>
+                        {item.label}
+                      </span>
+                      <span className="oset__flags">
+                        {item.flags.external ? <span className="oset__flag oset__flag--ext" title="外部数据源">源</span> : null}
+                        {item.flags.visibility ? <span className="oset__flag oset__flag--vis" title="显示 / 隐藏">隐</span> : null}
+                        {item.flags.rules ? <span className="oset__flag oset__flag--rule" title="数据校验">验</span> : null}
+                        {item.flags.events ? <span className="oset__flag oset__flag--evt" title="事件">事</span> : null}
+                        {item.flags.calculation ? <span className="oset__flag oset__flag--calc" title="高级计算">算</span> : null}
+                      </span>
+                    </div>
+                    <div className="oset__meta">
+                      <span className="oset__tag" title={`元素类型：${item.title}`}>{item.title}</span>
+                      <span className="oset__path" title={item.path}>{item.path}</span>
+                    </div>
                   </li>
                 );
               })}
@@ -305,7 +312,7 @@ export function OutlinePanel() {
             <div className="opanel__empty">
               还没有特殊设置。
               <br />
-              配置了外部数据源、显示 / 隐藏、校验或事件的元素会列在这里。
+              配置了外部数据源、显示 / 隐藏、校验、事件或高级计算的元素会列在这里。
             </div>
           )}
         </div>

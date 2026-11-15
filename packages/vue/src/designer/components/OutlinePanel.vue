@@ -2,8 +2,8 @@
 /**
  * 组件管理器（大纲面板）。
  * - 「组件树」tab：按树形列出整页节点，点得到、看得见层级、能拖、能删；
- * - 「特殊设置」tab（#6）：列出带外部数据源 / 显示隐藏 / 校验 / 事件的节点，
- *   直观展示哪些元素用了什么特殊配置，点行即选中定位。
+ * - 「特殊设置」tab（#6）：列出带外部数据源 / 显示隐藏 / 校验 / 事件 / 高级计算的节点，
+ *   每个条目都有配置标记、元素标签与绑定路径用于区分同名元素，点行即选中定位。
  *
  * 选中联动是双向的：树里点 → 画布选中并滚动到位；画布点 → 树自动展开祖先。
  */
@@ -111,7 +111,7 @@ function selectSetting(item: SpecialSettingItem): void {
     <!-- 特殊设置 -->
     <div v-show="tab === 'settings'" class="opanel__scroll wb-scroll">
       <div v-if="!settings.length" class="opanel__empty">
-        还没有特殊设置。<br />配置了外部数据源、显示 / 隐藏、校验或事件的元素会列在这里。
+        还没有特殊设置。<br />配置了外部数据源、显示 / 隐藏、校验、事件或高级计算的元素会列在这里。
       </div>
       <ul v-else class="oset">
         <li
@@ -124,13 +124,20 @@ function selectSetting(item: SpecialSettingItem): void {
           @mouseenter="store.hover(item.nodeId)"
           @mouseleave="store.hover(null)"
         >
-          <span class="oset__name" :title="item.label">{{ item.label }}</span>
-          <span class="oset__flags">
-            <span v-if="item.flags.external" class="oset__flag oset__flag--ext" title="外部数据源">源</span>
-            <span v-if="item.flags.visibility" class="oset__flag oset__flag--vis" title="显示 / 隐藏">隐</span>
-            <span v-if="item.flags.rules" class="oset__flag oset__flag--rule" title="数据校验">验</span>
-            <span v-if="item.flags.events" class="oset__flag oset__flag--evt" title="事件">事</span>
-          </span>
+          <div class="oset__main">
+            <span class="oset__name" :title="item.label">{{ item.label }}</span>
+            <span class="oset__flags">
+              <span v-if="item.flags.external" class="oset__flag oset__flag--ext" title="外部数据源">源</span>
+              <span v-if="item.flags.visibility" class="oset__flag oset__flag--vis" title="显示 / 隐藏">隐</span>
+              <span v-if="item.flags.rules" class="oset__flag oset__flag--rule" title="数据校验">验</span>
+              <span v-if="item.flags.events" class="oset__flag oset__flag--evt" title="事件">事</span>
+              <span v-if="item.flags.calculation" class="oset__flag oset__flag--calc" title="高级计算">算</span>
+            </span>
+          </div>
+          <div class="oset__meta">
+            <span class="oset__tag" :title="`元素类型：${item.title}`">{{ item.title }}</span>
+            <span class="oset__path" :title="item.path">{{ item.path }}</span>
+          </div>
         </li>
       </ul>
     </div>
@@ -243,14 +250,22 @@ function selectSetting(item: SpecialSettingItem): void {
 }
 .oset__row {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
   padding: 6px 6px;
   border-radius: 5px;
   font-size: 12px;
   color: var(--wb-ink2);
   cursor: pointer;
   user-select: none;
+}
+.oset__main,
+.oset__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 .oset__row:hover {
   background: var(--wb-bg);
@@ -292,5 +307,33 @@ function selectSetting(item: SpecialSettingItem): void {
 }
 .oset__flag--evt {
   background: #9333ea;
+}
+.oset__flag--calc {
+  background: #0891b2;
+}
+/* 元素标签 + 绑定路径：同名元素的去歧义信息 */
+.oset__tag {
+  flex: 0 0 auto;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 5px;
+  border: 1px solid var(--wb-line-soft);
+  border-radius: 3px;
+  background: var(--wb-bg);
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--wb-ink3);
+}
+.oset__path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--wb-ink3);
 }
 </style>

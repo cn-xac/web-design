@@ -1863,6 +1863,13 @@ select.wbd-input.wbd-sm {
 .calc__help-foot { margin: 18px 0 2px; font-size: 11.5px; color: var(--wb-ink3); }
 .calc__help-close { border: 1px solid var(--wb-line); border-radius: 5px; background: #fff; padding: 5px 14px; font-size: 12px; font-family: inherit; color: var(--wb-ink2); cursor: pointer; }
 .calc__help-close:hover { border-color: var(--wb-primary); color: var(--wb-primary); }
+
+/* 特殊设置：两行结构（名称 + 配置标记 / 元素标签 + 绑定路径） */
+.oset__row { flex-direction: column; align-items: stretch; gap: 3px; }
+.oset__main, .oset__meta { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.oset__flag--calc { background: #0891b2; }
+.oset__tag { flex: 0 0 auto; max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 5px; border: 1px solid var(--wb-line-soft); border-radius: 3px; background: var(--wb-bg); font-size: 10px; line-height: 15px; color: var(--wb-ink3); }
+.oset__path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--wb-mono); font-size: 10px; color: var(--wb-ink3); }
 .calc__fn-group { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; }
 .calc__fn-group-name { width: 72px; flex: none; font-size: 11px; color: var(--wb-ink3); }
 .calc__fn { padding: 3px 8px; font-family: var(--wb-mono); font-size: 11px; }
