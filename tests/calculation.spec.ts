@@ -153,7 +153,7 @@ describe("特殊设置清单（组件树）", () => {
       id: "p_special",
       type: "page",
       children: [
-        { id: "n_total", component: "text", props: { text: "{{form.n_total}}" }, calculation: config() },
+        { id: "n_total", component: "text", props: { label: "合计", text: "{{form.n_total}}" }, calculation: config() },
         { id: "n_plain", component: "input" },
         {
           id: "grp",
@@ -165,11 +165,49 @@ describe("特殊设置清单（组件树）", () => {
     };
     const items = collectSpecialSettings(page);
     expect(items.map((item) => item.nodeId)).toEqual(["n_total", "n_line"]);
-    expect(items[0]).toMatchObject({ title: "文本", path: "form.n_total" });
+    expect(items[0]).toMatchObject({
+      title: "文本",
+      elementLabel: "合计",
+      path: "form.n_total",
+    });
     expect(items[0].flags.calculation).toBe(true);
     expect(items[0].flags.external).toBe(false);
     // 子表单内的条目也带上 [0] 占位，与运行时路径一致
     expect(items[1].path).toBe("form.items[0].n_line");
+  });
+
+  it("元素标签兼容取值：按钮取内容、表单控件取 Label、没有 Label 置空", () => {
+    const page: PageSchema = {
+      schemaVersion: SCHEMA_VERSION,
+      id: "p_label",
+      type: "page",
+      children: [
+        { id: "b1", component: "button", props: { text: "提交" }, events: { click: [{ action: "toast" }] } },
+        { id: "i1", component: "input", props: { label: "姓名" }, rules: [{ type: "required" }] },
+        { id: "i2", component: "input", rules: [{ type: "required" }] },
+        {
+          id: "t1",
+          component: "text",
+          props: { label: "合计" },
+          visibility: { show: { mode: "and", rows: [] } },
+        },
+        {
+          id: "x1",
+          component: "biz-unknown",
+          props: { title: "自定义区块" },
+          events: { click: [{ action: "toast" }] },
+        },
+      ],
+    };
+    const byId = (id: string) => collectSpecialSettings(page).find((item) => item.nodeId === id);
+    expect(byId("b1")?.elementLabel).toBe("提交");
+    expect(byId("i1")?.elementLabel).toBe("姓名");
+    expect(byId("i2")?.elementLabel).toBe("");
+    expect(byId("t1")?.elementLabel).toBe("合计");
+    // 未登记物料按常见键兼容，不会因为缺元数据就全空
+    expect(byId("x1")?.elementLabel).toBe("自定义区块");
+    expect(byId("i1")?.label).toContain("姓名");
+    expect(byId("i2")?.label).not.toContain(" · ");
   });
 });
 

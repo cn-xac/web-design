@@ -231,7 +231,8 @@ describe("Vue 设计器：数据计算弹窗", () => {
           props: { label: "合计", text: "{{form.f1}}" },
           calculation: calcConfig,
         },
-        { id: "f2", component: "number", props: { label: "数量" } },
+        // 表单控件没有 Label：元素标签应置空（不渲染 tag）
+        { id: "f2", component: "number", calculation: calcConfig },
       ],
     });
     await tick();
@@ -242,10 +243,13 @@ describe("Vue 设计器：数据计算弹窗", () => {
     await tick();
 
     const rows = wrapper.findAll(".oset__row");
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(2);
     expect(rows[0].find(".oset__flag--calc").text()).toBe("算");
-    expect(rows[0].find(".oset__tag").text()).toBe("文本");
+    // 元素标签取元素自身的 Label / 内容，而不是物料类型
+    expect(rows[0].find(".oset__tag").text()).toBe("合计");
     expect(rows[0].find(".oset__path").text()).toBe("form.f1");
+    expect(rows[1].find(".oset__tag").exists()).toBe(false);
+    expect(rows[1].find(".oset__path").text()).toBe("form.f2");
     wrapper.unmount();
   });
 
