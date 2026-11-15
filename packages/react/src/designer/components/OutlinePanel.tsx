@@ -1,6 +1,7 @@
 import { useEffect, useState, type DragEvent } from "react";
 import {
   collectSpecialSettings,
+  elementLabelOf,
   getBreadcrumb,
   type DropPosition,
   type NodeSchema,
@@ -21,8 +22,8 @@ function OutlineTree({ nodes, depth, expanded, onToggle }: OutlineTreeProps) {
 
   const labelOf = (node: NodeSchema): string => {
     const material = registry.get(node.component);
-    const textProp = material?.textProp;
-    const summary = textProp ? String(node.props?.[textProp] ?? "").trim() : "";
+    // 与「特殊设置」共用同一套取值：表单控件看 Label、按钮看内容，取不到就留空
+    const summary = elementLabelOf(node, material);
     const suffix = summary ? ` · ${summary.slice(0, 12)}` : "";
     return `${material?.title ?? node.component}${suffix}`;
   };
@@ -301,7 +302,11 @@ export function OutlinePanel() {
                       </span>
                     </div>
                     <div className="oset__meta">
-                      <span className="oset__tag" title={`元素类型：${item.title}`}>{item.title}</span>
+                      {item.elementLabel ? (
+                        <span className="oset__tag" title={`元素标签：${item.elementLabel}`}>
+                          {item.elementLabel}
+                        </span>
+                      ) : null}
                       <span className="oset__path" title={item.path}>{item.path}</span>
                     </div>
                   </li>

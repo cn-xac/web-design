@@ -8,6 +8,7 @@
  * 所以「从物料面板拖新组件扔到树上某一行」也是合法操作。
  */
 import type { NodeSchema } from "@x-ac/web-design-core";
+import { elementLabelOf } from "@x-ac/web-design-core";
 import { useMaterialCatalog } from "../../materials/catalog";
 import { useDesignerStore } from "../store";
 
@@ -27,7 +28,8 @@ function materialOf(node: NodeSchema) {
 
 function labelOf(node: NodeSchema): string {
   const material = materialOf(node);
-  const summary = material?.textProp ? String(node.props?.[material.textProp] ?? "").trim() : "";
+  // 与「特殊设置」共用同一套取值：表单控件看 Label、按钮看内容，取不到就留空
+  const summary = elementLabelOf(node, material);
   const text = summary ? ` · ${summary.slice(0, 12)}` : "";
   return `${material?.title ?? node.component}${text}`;
 }

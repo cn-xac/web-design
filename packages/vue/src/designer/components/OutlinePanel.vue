@@ -135,7 +135,11 @@ function selectSetting(item: SpecialSettingItem): void {
             </span>
           </div>
           <div class="oset__meta">
-            <span class="oset__tag" :title="`元素类型：${item.title}`">{{ item.title }}</span>
+            <span
+              v-if="item.elementLabel"
+              class="oset__tag"
+              :title="`元素标签：${item.elementLabel}`"
+            >{{ item.elementLabel }}</span>
             <span class="oset__path" :title="item.path">{{ item.path }}</span>
           </div>
         </li>
