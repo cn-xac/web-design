@@ -16,7 +16,7 @@ pnpm add @x-ac/web-design-core
 import type { PageSchema } from "@x-ac/web-design-core";
 
 const page: PageSchema = {
-  schemaVersion: "1.0.0",
+  schemaVersion: "1.2.0",
   id: "page_employee",
   type: "page",
   meta: { title: "员工登记", device: "pc" },
@@ -83,9 +83,31 @@ console.log(toDataJSON(data, { includeMeta: true }));
 
 `exportData` 默认不导出空值（`includeEmpty: true` 可保留），并按绑定路径还原嵌套结构；`flat` 是同一份数据的扁平视图，方便直接丢给接口或表格。
 
+## 数据计算与高级函数（1.2.0 起）
+
+文字 / 数字元素可以选参与元素、写算式，运行时自动把结果回填到自己的绑定路径：
+
+```ts
+import { applyCalculations, CALCULATION_FUNCTIONS } from "@x-ac/web-design-core";
+
+// page.children 里某个节点带 calculation：
+// { operands: [{ alias: "A", path: "form.price" }, { alias: "B", path: "form.qty" }],
+//   formula: "ROUND(SUM(A * B, C), 2)" }
+const results = applyCalculations(page, scope);
+// [{ nodeId, path, value, changed, skipped }]；值不变则 changed=false（幂等）
+console.log(CALCULATION_FUNCTIONS.map((fn) => fn.name));
+// SUM AVG MIN MAX COUNT PRODUCT ROUND CEIL FLOOR ABS POWER SQRT MOD IF CONCAT LEN COALESCE ISBLANK
+```
+
+- 安全：通用 `{{path}}` 绑定表达式**仍禁函数调用**；只有计算模块通过 `evaluateWithFunctions()` 显式注入静态白名单函数表时才允许调用，函数名只是协议符号。
+- 子表单：明细字段路径用 `[0]` 占位，指定 `sum`/`avg`/`min`/`max` 按全部行聚合；子表单内目标逐行回填。
+- 参与条件复用 `ConditionGroup` / `evaluateConditionGroup`；保存前用 `validateCalculationConfig()` 校验别名、算式与聚合口径。
+- 每个函数在 `CALCULATION_FUNCTIONS` 里都带 `params` / `returns` / `example` 元数据，设计器弹窗悬停函数名即可查看；完整手册见容器根 `docs/CALCULATION_FUNCTIONS.md`。
+
 ## 其他能力
 
-- `expression.ts`：自研 tokenizer + Pratt parser，禁用 `eval`、函数调用与原型链逃逸
+- `expression.ts`：自研 tokenizer + Pratt parser，禁用 `eval` 与原型链逃逸；默认禁函数调用，白名单函数仅经 `evaluateWithFunctions()` 注入
+- `calculation/`：数据计算契约、18 个高级函数白名单、求值与设计期目标清单
 - `tree.ts`：节点增删改移、面包屑、按新 id 克隆
 - `style/`：通用 margin / padding（四边相等收敛成简写）+ 组件契约样式
 - `actions/`：8 个声明式动作，副作用通过 `ActionAdapter` 注入

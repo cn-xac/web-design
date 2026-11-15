@@ -95,6 +95,7 @@ pnpm add @x-ac/web-design-react @x-ac/web-design-core react react-dom
 - **设计器内核**：`DesignerStore`（状态机）、`PageRepository` / `PageRecord` / `createMemoryRepository(seed?)` / `setPageRepository(repo)` / `getPageRepository()`。
 - **表达式/工具**：`resolveValue(expr, scope)` / `getByPath` / `setByPath` / `deepClone` / `materialKey` / `resolveNodeStyle` / `resolveDefaults` / `isBindable` / `resolveBoolean`。
 - **显隐与多条件（1.1.0 起）**：`resolveVisibility(node, scope, external?, ctx?)`（优先级：外部 force → 本地 show → 本地 hide → 外部非强制 → 旧 directives → 默认显示）/ `resolveDirectiveVisibility` / `resolveLoopInstances` / `evaluateConditionGroup` / `evaluateConditionRow` / `validateAdvancedExpression` / `aggregateSeries` / `collectConditionElements`；类型 `VisibilityConfig` `ConditionGroup` `ConditionRow` `ExternalVisibility` `VisibilityDecision`。`collectConditionElements(page, { nodeId })` 是设计期条件源清单，按子表单单向裁剪。
+- **数据计算与高级函数（1.2.0 起，rtHicl）**：`applyCalculations(page, scope, opts?)`（整页重算 + 值变化才写回，幂等）/ `evaluateCalculation(config, scope, rowIndex?)` / `resolveCalculationOperand` / `calculationRowIndexes` / `validateCalculationConfig` / `validateCalculationFormula` / `collectCalculationTargets` / `canOwnCalculation` / `CALCULATION_FUNCTIONS`（18 个白名单函数）/ `CALCULATION_FUNCTION_MAP` / `calculationFunctionGroups`；类型 `CalculationConfig` `CalculationOperand` `CalculationTarget` `CalculationResult`。表达式层新增 `evaluateWithFunctions` / `validateExpression`（仅计算模块注入白名单函数表时允许调用）。
 
 ### 4.2 `@x-ac/web-design-vue`
 
@@ -132,7 +133,7 @@ pnpm add @x-ac/web-design-react @x-ac/web-design-core react react-dom
 
 ```jsonc
 {
-  "schemaVersion": "1.1.0",
+  "schemaVersion": "1.2.0",
   "id": "page_employee",
   "type": "page",
   "meta": { "title": "员工登记", "device": "pc" },
@@ -155,6 +156,7 @@ pnpm add @x-ac/web-design-react @x-ac/web-design-core react react-dom
 - 绑定：把 `props.modelValue` 写成 `"{{scopeVar}}"`，引擎按路径双向同步（Vue `modelValue/update:modelValue`，React `value/onChange`）。
 - 校验规则 `rules[].type`：`required`/`minLength`/`maxLength`/`min`/`max`/`pattern`(可带 `flags`)/`email`/`phone`/`integer`；通用 `message`(支持 `{label}`/`{value}`)、`when`(条件表达式)。
 - 指令 `directives`：`show`/`if`(布尔表达式控制显隐)、`for`(`value` 遍历表达式，`itemKey`/`indexKey` 别名)。**旧指令保留兼容**，新页面优先用 `visibility`。
+- `calculation`（1.2.0 起）：`{ operands: [{ alias, path, aggregate? }], formula, when?: ConditionGroup, precision?, emptyAsZero?, output? }`，挂在目标节点自身；运行时按参与元素与受限算式求值并回填该节点绑定路径。子表单明细字段用 `[0]` 占位，`aggregate` 支持 `sum`/`avg`/`min`/`max`；参与条件复用 `ConditionGroup`。函数名必须命中 `CALCULATION_FUNCTIONS` 白名单（18 个），**通用绑定表达式仍禁函数调用**。文字元素无 `modelValue` 时，设计器保存会自动把 `textProp` 绑成 `{{回填路径}}`。详见 `docs/INTEGRATION.md` 第 12 节。
 - `visibility`：`{ show?: ConditionGroup; hide?: ConditionGroup }`，配置在目标节点自身、只控制自身；显示高于隐藏。条件行 `left` / `aggregate` / `operator` / `value`，`mode` 为 `and` | `or` | `advanced`（`expression` 如 `1 and (2 or 3)`）。子表单内只能引用同一子表单，子表单外引用明细字段需 `aggregate: sum|avg|min|max`（缺省 sum）。宿主可用 `SchemaRenderer` 的 `visibility` prop 按节点 id 传 `{ visible, force? }`。
 - 事件 `events`：键为事件名（kebab 如 `row-click`，引擎转 `rowClick`/`onRowClick`）；值为 `ActionSchema[]`。
 
@@ -304,3 +306,5 @@ pnpm --filter react-example dev   # http://127.0.0.1:5175
 - `SchemaRenderer`（vue `SchemaRenderer.vue` 与 react `SchemaRenderer.tsx`）现已对根级 `schema.children` 兜底 `?? []`：畸形 Schema（缺 `children`）不再在渲染入口崩溃，安全降级为空态。递归的 `SchemaNode` 此前已对 `node.children` 兜底。
 - `schemaVersion` 已升 `1.1.0`（迁移链 `1.0.0 → 1.1.0`，旧结构无需变换）。新增节点级 `visibility` 显隐契约与通用多条件组件；`if` / `show` / `for` 的判定统一收敛到 core 的 `resolveVisibility` / `resolveLoopInstances`，Vue / React / 静态 HTML 三端共用。两端 `SchemaRenderer` 新增 `visibility` prop 支持外部强制控制；子表单的显隐求值使用行级隔离 scope。详见 `docs/INTEGRATION.md` 第 11 节。
 - React 设计器已与 Vue 验收版对齐：新增 `DesignerDialogsProvider` 承载六个弹窗（绑定选择 / 选项录入 / 外部数据源 / 显示隐藏条件 / 子映射 / 请求头），属性面板补齐「外部数据源」入口与选项弹窗入口，条件配置由内联区块改为弹窗（`ConditionBuilder` 现为 `ConditionTrigger` 的兼容别名），并新增 `ModalShell` / `HelpTip` / `NativeTooltip` 与对应样式。弹窗状态挂在设计器实例上（Context），不使用全局单例，多实例与测试互不污染。
+- **数据计算（rtHicl）**：`schemaVersion` 升 `1.2.0`（迁移链 `1.1.0 → 1.2.0`，旧结构不变）；core 新增 `calculation/`（契约 / 18 个高级函数白名单 / 求值 / 目标清单），`NodeSchema.calculation` 进 serialize / validator / JSON Schema；Vue `usePageScope` 用 deep watch、React `usePageStore` 用 `useEffect([version, page])` 触发同一份 `applyCalculations`；两端设计器新增计算弹窗（样式 Tab 的「数据计算」入口）与 `setCalculation`（撤销栈原子写入 + 文字元素自动绑定）。**注意**：样式面板的条件按钮选择器若要精确匹配，用 `.style__cond-btn:not(.style__calc-btn)` 排除计算入口。
+- 高级函数逐个使用说明（参数 / 返回 / 示例 / 业务配方 / 排错）见容器根 `docs/CALCULATION_FUNCTIONS.md`；`CALCULATION_FUNCTIONS` 每项都带 `params` / `returns` / `example` 元数据，设计器弹窗悬停函数按钮即展示同一份内容。新增函数只改这张表即可同步解析器、面板与校验。
