@@ -220,6 +220,35 @@ describe("Vue 设计器：数据计算弹窗", () => {
     wrapper.unmount();
   });
 
+  it("组件树「特殊设置」列出高级计算节点，并展示元素标签与绑定路径", async () => {
+    const { wrapper, store } = await mountDesigner();
+    store.setPage({
+      ...store.page,
+      children: [
+        {
+          id: "f1",
+          component: "text",
+          props: { label: "合计", text: "{{form.f1}}" },
+          calculation: calcConfig,
+        },
+        { id: "f2", component: "number", props: { label: "数量" } },
+      ],
+    });
+    await tick();
+
+    const tabs = wrapper.findAll(".opanel__tab");
+    expect(tabs).toHaveLength(2);
+    await tabs[1].trigger("click");
+    await tick();
+
+    const rows = wrapper.findAll(".oset__row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].find(".oset__flag--calc").text()).toBe("算");
+    expect(rows[0].find(".oset__tag").text()).toBe("文本");
+    expect(rows[0].find(".oset__path").text()).toBe("form.f1");
+    wrapper.unmount();
+  });
+
   it("非文字 / 数字元素的计算入口禁用", async () => {
     const { wrapper, store } = await mountDesigner();
     store.select("f2");

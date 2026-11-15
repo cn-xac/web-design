@@ -13,6 +13,7 @@ import {
   applyCalculations,
   canOwnCalculation,
   collectCalculationTargets,
+  collectSpecialSettings,
   compactNode,
   evaluate,
   evaluateCalculation,
@@ -142,6 +143,33 @@ describe("高级函数使用说明常量（弹窗与手册同源）", () => {
     expect(CALCULATION_RECIPES.every((item) => item.scene && item.operands && item.formula)).toBe(true);
     expect(CALCULATION_TROUBLESHOOTING.every((item) => item.symptom && item.cause && item.fix)).toBe(true);
     expect(CALCULATION_USAGE_NOTES.every((note) => note.length > 10)).toBe(true);
+  });
+});
+
+describe("特殊设置清单（组件树）", () => {
+  it("带高级计算的节点被收录，并给出元素标签与绑定路径", () => {
+    const page: PageSchema = {
+      schemaVersion: SCHEMA_VERSION,
+      id: "p_special",
+      type: "page",
+      children: [
+        { id: "n_total", component: "text", props: { text: "{{form.n_total}}" }, calculation: config() },
+        { id: "n_plain", component: "input" },
+        {
+          id: "grp",
+          component: "ec-subform",
+          props: { itemPath: "items" },
+          children: [{ id: "n_line", component: "number", calculation: config() }],
+        },
+      ],
+    };
+    const items = collectSpecialSettings(page);
+    expect(items.map((item) => item.nodeId)).toEqual(["n_total", "n_line"]);
+    expect(items[0]).toMatchObject({ title: "文本", path: "form.n_total" });
+    expect(items[0].flags.calculation).toBe(true);
+    expect(items[0].flags.external).toBe(false);
+    // 子表单内的条目也带上 [0] 占位，与运行时路径一致
+    expect(items[1].path).toBe("form.items[0].n_line");
   });
 });
 

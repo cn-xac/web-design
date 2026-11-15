@@ -243,6 +243,34 @@ describe("React 设计器：数据计算弹窗", () => {
     }
   });
 
+  it("组件树「特殊设置」列出高级计算节点，并展示元素标签与绑定路径", async () => {
+    const ui = setup(
+      pageWith([
+        {
+          id: "f1",
+          component: "text",
+          props: { label: "合计", text: "{{form.f1}}" },
+          calculation: calcConfig,
+        },
+        { id: "f2", component: "number", props: { label: "数量" } },
+      ]),
+    );
+    try {
+      await ui.render();
+      const tabs = ui.container.querySelectorAll(".opanel__tab");
+      expect(tabs).toHaveLength(2);
+      await click(tabs[1]);
+
+      const rows = ui.container.querySelectorAll(".oset__row");
+      expect(rows).toHaveLength(1);
+      expect(rows[0].querySelector(".oset__flag--calc")?.textContent).toBe("算");
+      expect(rows[0].querySelector(".oset__tag")?.textContent).toBe("文本");
+      expect(rows[0].querySelector(".oset__path")?.textContent).toBe("form.f1");
+    } finally {
+      await ui.cleanup();
+    }
+  });
+
   it("函数按钮插入签名；移除计算后配置消失", async () => {
     const ui = setup(
       pageWith([
