@@ -310,12 +310,12 @@ export function StyleEditor() {
         </div>
       ))}
 
-      <div className="style__section">数据计算</div>
+      <div className="style__section">高级计算（数据计算）</div>
       <div className="style__row style__row--block">
-        <label>自动计算</label>
+        <label>高级计算</label>
         <CalculationTrigger />
         <div className="style__tip">
-          仅文字 / 数字元素可配置；结果自动填入当前元素，支持高级函数与子表单聚合
+          仅文字 / 数字元素可配置高级计算；结果自动填入当前元素，支持高级函数与子表单聚合
         </div>
       </div>
 

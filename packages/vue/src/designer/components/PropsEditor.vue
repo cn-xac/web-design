@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, reactive, type Component } from "vue";
 import type { PropField, PropFieldGroup } from "@x-ac/web-design-core";
-import { FIELD_GROUP_LABELS, canOwnExternalSource, fieldOptions, groupFields, parseOptions } from "@x-ac/web-design-core";
+import { FIELD_GROUP_LABELS, canOwnCalculation, canOwnExternalSource, fieldOptions, groupFields, parseOptions } from "@x-ac/web-design-core";
 import UiControl from "../ui/UiControl.vue";
 import { useMaterialCatalog } from "../../materials/catalog";
 import { useDesignerStore } from "../store";
 import { useNotify } from "../ui/kit";
 import { useUiAdapter } from "../../renderer/context";
-import { useBindingPicker, useExternalSourceDialog, useOptionsDialog } from "../dialogs";
+import { useBindingPicker, useCalculationDialog, useExternalSourceDialog, useOptionsDialog } from "../dialogs";
 
 const notify = useNotify();
 
@@ -17,6 +17,7 @@ const uiAdapter = useUiAdapter();
 const bindingPicker = useBindingPicker();
 const optionsDialog = useOptionsDialog();
 const externalDialog = useExternalSourceDialog();
+const calculationDialog = useCalculationDialog();
 
 /**
  * 字段编辑器覆盖：适配包可以用自己库的控件替换某一类字段的编辑器。
@@ -167,6 +168,30 @@ const externalTitle = computed(() => {
   return hasExternal.value ? "已配置外部数据源，点击修改" : "配置外部数据源（接口取数）";
 });
 
+/* ---------------- 高级计算入口（属性面板头部，与「外部数据源」并列） ---------------- */
+
+/** 节点是否已配高级计算 */
+const hasCalculation = computed(() => Boolean(node.value?.calculation));
+
+/** 仅文字 / 数字元素可配置；传当前适配包目录，EP 专有物料也能认出来 */
+const canCalculate = computed(() =>
+  node.value ? canOwnCalculation(node.value, { registry: catalog }) : false,
+);
+
+const calculationTitle = computed(() => {
+  if (!canCalculate.value) return "仅文字 / 数字元素可配置高级计算（文本、标题、统计值、数字输入框等）";
+  return hasCalculation.value ? "已配置高级计算，点击修改" : "配置高级计算（选元素 + 算式 + 高级函数）";
+});
+
+function openCalculation(): void {
+  if (!node.value) return;
+  if (!canCalculate.value) {
+    notify("请先在画布中选中文字 / 数字元素，再配置高级计算", "error");
+    return;
+  }
+  calculationDialog.open({ nodeId: node.value.id, label: material.value?.title ?? node.value.component });
+}
+
 function copyId(): void {
   if (!node.value) return;
   void navigator.clipboard?.writeText(node.value.id);
@@ -188,6 +213,16 @@ function copyId(): void {
         @click="openExternal"
       >
         外部数据源{{ hasExternal ? " ●" : "" }}
+      </button>
+      <button
+        type="button"
+        class="props__calc"
+        :class="{ 'is-on': hasCalculation, 'is-disabled': !canCalculate }"
+        :aria-disabled="!canCalculate"
+        :title="calculationTitle"
+        @click="openCalculation"
+      >
+        高级计算{{ hasCalculation ? " ●" : "" }}
       </button>
     </div>
 
@@ -330,6 +365,7 @@ function copyId(): void {
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 .props__chip {
   font-size: 12px;
@@ -499,6 +535,33 @@ function copyId(): void {
   border-style: dashed;
   background: #fbfcfe;
 }
+/* 高级计算入口：与「外部数据源」并列的弱禁用按钮（仍可见、点击给原因） */
+.props__calc {
+  border: 1px solid var(--wb-line);
+  border-radius: 4px;
+  background: #fff;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--wb-ink2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.props__calc:hover {
+  border-color: var(--wb-primary);
+  color: var(--wb-primary);
+}
+.props__calc.is-on {
+  border-color: var(--wb-primary);
+  background: var(--wb-primary-soft);
+  color: var(--wb-primary);
+}
+.props__calc.is-disabled {
+  color: var(--wb-ink4, #a8b0be);
+  border-style: dashed;
+  background: #fbfcfe;
+}
+
 /* 选项录入入口：摘要 + 编辑按钮，点开是独立弹窗 */
 .props__options {
   width: 100%;

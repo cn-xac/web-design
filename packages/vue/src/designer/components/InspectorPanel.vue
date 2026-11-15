@@ -114,7 +114,9 @@ const tabEvents = computed(() => selectedMaterial.value?.events ?? []);
         <PageSettings v-if="pageTab === 'settings'" />
         <SchemaViewer v-else />
       </div>
-      <div class="inspector__footer inspector__footer--tip">点击画布中的任意元素以编辑其属性</div>
+      <div class="inspector__footer inspector__footer--tip">
+        点击画布中的文字 / 数字元素，在属性面板头部点「高级计算」即可配置
+      </div>
     </template>
   </aside>
 </template>

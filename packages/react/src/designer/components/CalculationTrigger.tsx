@@ -28,7 +28,7 @@ export function CalculationTrigger() {
         })
       }
     >
-      {summary} · 配置
+      {summary} · 配置高级计算
     </button>
   );
 }

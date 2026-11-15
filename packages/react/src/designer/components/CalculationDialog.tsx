@@ -238,18 +238,18 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
     }
     store.setCalculation(config);
     onClose();
-    notify("数据计算已更新", "success");
+    notify("高级计算已更新", "success");
   }
 
   function clear(): void {
     store.setCalculation(undefined);
     onClose();
-    notify("已移除数据计算配置", "success");
+    notify("已移除高级计算配置", "success");
   }
 
   return (
     <ModalShell
-      title="配置数据计算"
+      title="配置高级计算"
       width="760px"
       escToClose={!helpVisible}
       onClose={onClose}

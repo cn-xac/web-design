@@ -298,19 +298,19 @@ function directiveValue(name: "show" | "if" | "for"): string {
       />
     </div>
 
-    <div class="style__section">数据计算</div>
+    <div class="style__section">高级计算（数据计算）</div>
     <div class="style__row style__row--block">
-      <label>自动计算</label>
+      <label>高级计算</label>
       <button
         type="button"
         class="style__cond-btn style__calc-btn"
         :disabled="!canCalculate"
         @click="openCalculation"
       >
-        {{ calculationSummary }} · 配置
+        {{ calculationSummary }} · 配置高级计算
       </button>
       <div class="style__tip">
-        {{ canCalculate ? "结果自动填入当前元素；支持高级函数与子表单聚合" : "仅文字 / 数字元素可配置数据计算" }}
+        {{ canCalculate ? "结果自动填入当前元素；支持高级函数与子表单聚合" : "仅文字 / 数字元素可配置高级计算" }}
       </div>
     </div>
 

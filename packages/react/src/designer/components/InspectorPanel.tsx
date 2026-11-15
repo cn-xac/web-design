@@ -139,7 +139,7 @@ export function InspectorPanel() {
             {pageTab === "settings" ? <PageSettings /> : <SchemaViewer />}
           </div>
           <div className="inspector__footer inspector__footer--tip">
-            点击画布中的任意元素以编辑其属性
+            点击画布中的文字 / 数字元素，在属性面板头部点「高级计算」即可配置
           </div>
         </>
       )}

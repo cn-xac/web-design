@@ -245,20 +245,20 @@ function save(): void {
   }
   store.setCalculation(config);
   dialog.close();
-  notify("数据计算已更新", "success");
+  notify("高级计算已更新", "success");
 }
 
 function clear(): void {
   store.setCalculation(undefined);
   dialog.close();
-  notify("已移除数据计算配置", "success");
+  notify("已移除高级计算配置", "success");
 }
 </script>
 
 <template>
   <ModalShell
     v-if="dialog.visible.value && dialog.target.value"
-    title="配置数据计算"
+    title="配置高级计算"
     width="760px"
     :esc-to-close="!helpVisible"
     @close="dialog.close()"

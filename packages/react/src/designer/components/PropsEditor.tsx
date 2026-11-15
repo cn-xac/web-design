@@ -6,6 +6,7 @@ import { createElement, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import {
   FIELD_GROUP_LABELS,
+  canOwnCalculation,
   canOwnExternalSource,
   fieldOptions,
   groupFields,
@@ -83,6 +84,23 @@ export function PropsEditor() {
 
   /** 节点是否已配外部数据源（通过 externalRef 引用页面级源） */
   const hasExternal = Boolean(node.externalRef);
+
+  /* ---------------- 高级计算入口（属性面板头部，与「外部数据源」并列） ---------------- */
+  const hasCalculation = Boolean(node.calculation);
+  /** 传当前适配包目录，EP / antd 专有文字数字物料也能认出来 */
+  const canCalculate = canOwnCalculation(node, { registry });
+  const calculationTitle = !canCalculate
+    ? "仅文字 / 数字元素可配置高级计算（文本、标题、统计值、数字输入框等）"
+    : hasCalculation
+      ? "已配置高级计算，点击修改"
+      : "配置高级计算（选元素 + 算式 + 高级函数）";
+  const openCalculation = (): void => {
+    if (!canCalculate) {
+      notify("请先在画布中选中文字 / 数字元素，再配置高级计算", "error");
+      return;
+    }
+    dialogs.openCalculation({ nodeId, label: material.title ?? node.component });
+  };
 
   /**
    * 该元素是否允许拥有外部数据源。
@@ -327,6 +345,15 @@ export function PropsEditor() {
           onClick={openExternal}
         >
           外部数据源{hasExternal ? " ●" : ""}
+        </button>
+        <button
+          type="button"
+          className={`props__calc${hasCalculation ? " is-on" : ""}${canCalculate ? "" : " is-disabled"}`}
+          aria-disabled={!canCalculate}
+          title={calculationTitle}
+          onClick={openCalculation}
+        >
+          高级计算{hasCalculation ? " ●" : ""}
         </button>
       </div>
 
