@@ -11,14 +11,30 @@ import {
   type SpacingKey,
   type SpacingSide,
 } from "@x-ac/web-design-core";
-import { CONDITION_MODE_OPTIONS } from "@x-ac/web-design-core";
+import { CONDITION_MODE_OPTIONS, canOwnCalculation } from "@x-ac/web-design-core";
 import { useDesignerStore } from "../store";
-import { useConditionDialog } from "../dialogs";
+import { useCalculationDialog, useConditionDialog } from "../dialogs";
 import UiControl from "../ui/UiControl.vue";
 
 const store = useDesignerStore();
 const node = computed(() => store.selectedNode);
 const conditionDialog = useConditionDialog();
+const calculationDialog = useCalculationDialog();
+
+/** 仅文字 / 数字元素可配置数据计算（rtHicl） */
+const canCalculate = computed(() => (node.value ? canOwnCalculation(node.value) : false));
+const calculationSummary = computed(() => {
+  const config = node.value?.calculation;
+  return config ? `${config.operands.length} 个元素 · ${config.formula}` : "未配置";
+});
+
+function openCalculation(): void {
+  if (!node.value || !canCalculate.value) return;
+  calculationDialog.open({
+    nodeId: node.value.id,
+    label: String(node.value.props?.label ?? node.value.component),
+  });
+}
 
 /** 条件摘要：让属性面板在不打开弹窗时也能看出配置状态 */
 function conditionSummary(kind: "show" | "hide"): string {
@@ -280,6 +296,22 @@ function directiveValue(name: "show" | "if" | "for"): string {
         :placeholder="field.placeholder"
         @update:model-value="(v: string) => store.updateStyle(field.key, v)"
       />
+    </div>
+
+    <div class="style__section">数据计算</div>
+    <div class="style__row style__row--block">
+      <label>自动计算</label>
+      <button
+        type="button"
+        class="style__cond-btn style__calc-btn"
+        :disabled="!canCalculate"
+        @click="openCalculation"
+      >
+        {{ calculationSummary }} · 配置
+      </button>
+      <div class="style__tip">
+        {{ canCalculate ? "结果自动填入当前元素；支持高级函数与子表单聚合" : "仅文字 / 数字元素可配置数据计算" }}
+      </div>
     </div>
 
     <div class="style__section">显示 / 隐藏条件</div>

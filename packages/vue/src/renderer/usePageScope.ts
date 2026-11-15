@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch, type Ref } from "vue";
 import type { PageSchema } from "@x-ac/web-design-core";
 import {
+  applyCalculations,
   collectBindableElements,
   collectExternalSources,
   deepClone,
@@ -121,6 +122,19 @@ export function usePageScope(
       });
     },
     { deep: true },
+  );
+
+  /**
+   * 数据计算（rtHicl）：参与元素变化后自动重算并回填当前元素。
+   * core 的 applyCalculations 只在「值变化」时写，因此这里写回触发的下一轮
+   * watch 会立刻收敛，不会形成循环；设计态同样能看到计算结果。
+   */
+  watch(
+    scope,
+    () => {
+      applyCalculations(page.value, scope);
+    },
+    { deep: true, immediate: true, flush: "post" },
   );
 
   onMounted(() => {

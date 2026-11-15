@@ -12,6 +12,7 @@ import { defineStore } from "pinia";
 import { DesignerStore } from "@x-ac/web-design-core";
 import type {
   ActionSchema,
+  CalculationConfig,
   DesignerState,
   DeviceType,
   ExternalDataSource,
@@ -93,6 +94,7 @@ export const useDesignerStore = defineStore("designer", () => {
   const setEventActions = (name: string, actions: ActionSchema[]) => kernel.setEventActions(name, actions);
   const setDirective = (name: "show" | "if" | "for", value: string) => kernel.setDirective(name, value);
   const setVisibility = (config: VisibilityConfig | undefined) => kernel.setVisibility(config);
+  const setCalculation = (config: CalculationConfig | undefined) => kernel.setCalculation(config);
   const addDataSourceEntry = (key: string, json: string) => kernel.addDataSourceEntry(key, json);
   const beginDrag = (payload: { kind: "new"; component: string } | { kind: "move"; id: string }) =>
     kernel.beginDrag(payload);
@@ -153,6 +155,7 @@ export const useDesignerStore = defineStore("designer", () => {
     setEventActions,
     setDirective,
     setVisibility,
+    setCalculation,
     addDataSourceEntry,
     beginDrag,
     setDropHint,

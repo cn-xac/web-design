@@ -13,6 +13,7 @@ import ExternalSourceDialog from "./components/ExternalSourceDialog.vue";
 import ExternalSubMapDialog from "./components/ExternalSubMapDialog.vue";
 import HeadersDialog from "./components/HeadersDialog.vue";
 import ConditionBuilder from "./components/ConditionBuilder.vue";
+import CalculationDialog from "./components/CalculationDialog.vue";
 import { migratePage } from "@x-ac/web-design-core";
 import { validatePage } from "@x-ac/web-design-core";
 import { useMaterialCatalog } from "../materials/catalog";
@@ -301,6 +302,7 @@ function backToList(): void {
     <ExternalSubMapDialog />
     <HeadersDialog />
     <ConditionBuilder />
+    <CalculationDialog />
   </div>
 </template>
 

@@ -115,6 +115,29 @@ export function useConditionDialog() {
   return { visible: conditionVisible, target: conditionTarget, open, close };
 }
 
+/* ---------------- 数据计算（rtHicl） ---------------- */
+
+/** 计算配置的落点：哪个文字 / 数字元素要自动回填结果 */
+export interface CalculationTarget {
+  nodeId: string;
+  label: string;
+}
+
+const calculationVisible = ref(false);
+const calculationTarget = ref<CalculationTarget | null>(null);
+
+export function useCalculationDialog() {
+  function open(target: CalculationTarget): void {
+    calculationTarget.value = target;
+    calculationVisible.value = true;
+  }
+  function close(): void {
+    calculationVisible.value = false;
+    calculationTarget.value = null;
+  }
+  return { visible: calculationVisible, target: calculationTarget, open, close };
+}
+
 /* ---------------- 子映射（响应目标为子表单时） ---------------- */
 
 /** 子映射的落点：属于哪条响应映射、目标子表单是谁 */
