@@ -30,7 +30,7 @@ export function CalculationHelpDialog({ onClose }: CalculationHelpDialogProps) {
     </>}>
       <div className="calc__help">
         <p className="calc__help-intro">
-          高级函数只在数据计算算式里可用；函数名必须命中下方 18 个白名单，
+          高级函数只在数据计算算式里可用；函数名必须命中下方 30 个白名单，
           通用绑定表达式仍禁止函数调用。点击函数名可把签名插入算式，悬停可看单函数说明。
         </p>
 
@@ -44,7 +44,7 @@ export function CalculationHelpDialog({ onClose }: CalculationHelpDialogProps) {
         </section>
 
         <section className="calc__help-block">
-          <h4>二、函数参考（18 个）</h4>
+          <h4>二、函数参考（30 个）</h4>
           {groups.map((group) => (
             <div className="calc__help-group" key={group.group}>
               <h5>

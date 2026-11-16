@@ -24,7 +24,7 @@ const groups = calculationFunctionGroups();
     <ModalShell title="高级函数使用说明" width="860px" @close="emit('close')">
       <div class="calc__help">
         <p class="calc__help-intro">
-          高级函数只在数据计算算式里可用；函数名必须命中下方 18 个白名单，
+          高级函数只在数据计算算式里可用；函数名必须命中下方 30 个白名单，
           通用绑定表达式仍禁止函数调用。点击函数名可把签名插入算式，悬停可看单函数说明。
         </p>
 
@@ -36,7 +36,7 @@ const groups = calculationFunctionGroups();
         </section>
 
         <section class="calc__help-block">
-          <h4>二、函数参考（18 个）</h4>
+          <h4>二、函数参考（30 个）</h4>
           <div v-for="group in groups" :key="group.group" class="calc__help-group">
             <h5>{{ group.group }}（{{ group.items.length }}）</h5>
             <div class="calc__help-grid">

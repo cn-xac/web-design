@@ -15,11 +15,16 @@ import {
   CALCULATION_ALIASES,
   CONDITION_MODE_OPTIONS,
   CONDITION_OPERATOR_OPTIONS,
+  FORMULA_NUMBER_BUTTONS,
+  FORMULA_OPERATOR_BUTTONS,
+  buildFunctionCall,
   calculationFunctionGroups,
   collectCalculationTargets,
   collectConditionElements,
   evaluateCalculation,
   findLocation,
+  functionArgSlots,
+  insertFormulaToken,
   setByPath,
   validateCalculationConfig,
   validateCalculationFormula,
@@ -31,6 +36,7 @@ import {
   type ConditionMode,
   type ConditionOperator,
   type ConditionRow,
+  type FunctionArgHint,
   type Scope,
 } from "@x-ac/web-design-core";
 import { useDesignerStore } from "../store";
@@ -56,8 +62,11 @@ const store = useDesignerStore();
 const dialog = useCalculationDialog();
 const notify = useNotify();
 const formulaEl = ref<HTMLTextAreaElement | null>(null);
-/** 当前查看说明的函数；悬停 / 聚焦时切换，点击按钮仍只负责插入签名 */
+/** 当前查看说明的函数；悬停 / 聚焦时切换 */
 const activeFn = ref<CalculationFunction | null>(null);
+/** 正在做参数引导的函数（与悬停说明卡分开） */
+const guideFn = ref<CalculationFunction | null>(null);
+const argSlots = ref<Array<FunctionArgHint & { value: string }>>([]);
 /** 完整使用说明（内容较长，单独一层弹窗承载） */
 const helpVisible = ref(false);
 
@@ -109,6 +118,7 @@ function blankConditionRow(): DraftConditionRow {
 }
 
 function load(): void {
+  closeFunctionGuide();
   const config = findLocation(store.page.children, nodeId.value)?.node?.calculation;
   if (!config) {
     draft.value = {
@@ -213,21 +223,65 @@ function removeConditionRow(index: number): void {
   draft.value.whenRows.splice(index, 1);
 }
 
-/** 把函数签名插到光标处；没有焦点时追加到末尾 */
-function insertFunction(signature: string): void {
+/** 把 token 插到算式光标处；textarea 没有焦点时追加到末尾 */
+function insertToken(token: string): void {
   const element = formulaEl.value;
   const text = draft.value.formula;
-  if (!element) {
-    draft.value.formula = text.trim() ? `${text.trim()} + ${signature}` : signature;
+  const start = element?.selectionStart ?? text.length;
+  const end = element?.selectionEnd ?? start;
+  const result = insertFormulaToken(text, token, start, end);
+  draft.value.formula = result.formula;
+  void nextTick(() => {
+    const el = formulaEl.value;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(result.cursor, result.cursor);
+  });
+}
+
+/** Excel 式点选引用：点元素就把别名写进算式 */
+function insertOperand(alias: string): void {
+  if (alias.trim()) insertToken(alias.trim());
+}
+
+/** 点函数名：打开参数引导；无参函数直接插入调用 */
+function beginFunctionGuide(fn: CalculationFunction): void {
+  const slots = functionArgSlots(fn);
+  if (!slots.length) {
+    insertToken(buildFunctionCall(fn.name, []));
     return;
   }
-  const start = element.selectionStart ?? text.length;
-  const end = element.selectionEnd ?? start;
-  draft.value.formula = text.slice(0, start) + signature + text.slice(end);
-  void nextTick(() => {
-    element.focus();
-    element.setSelectionRange(start + signature.length, start + signature.length);
-  });
+  guideFn.value = fn;
+  argSlots.value = slots.map((slot) => ({ ...slot, value: slot.default ?? "" }));
+}
+
+function closeFunctionGuide(): void {
+  guideFn.value = null;
+  argSlots.value = [];
+}
+
+/** 参数槽里点选元素：把该元素的别名填进当前槽 */
+function setSlotFromElement(index: number, path: string): void {
+  const alias = draft.value.operands.find((operand) => operand.path === path)?.alias;
+  if (alias?.trim()) argSlots.value[index].value = alias.trim();
+  else notify("请先在上方的参与元素中加入该元素", "error");
+}
+
+function onSlotElementChange(index: number, event: Event): void {
+  const target = event.target as HTMLSelectElement | null;
+  if (target?.value) setSlotFromElement(index, target.value);
+}
+
+/** 参数填完 → 拼成调用文本插进算式 */
+function insertGuidedFunction(): void {
+  if (!guideFn.value) return;
+  const values = argSlots.value.map((slot) => slot.value.trim());
+  if (values.some((value) => !value)) {
+    notify("请先填完每个参数，或点元素填入别名", "error");
+    return;
+  }
+  insertToken(buildFunctionCall(guideFn.value.name, values));
+  closeFunctionGuide();
 }
 
 function save(): void {
@@ -289,6 +343,13 @@ function clear(): void {
           </option>
         </select>
         <input v-model="operand.alias" class="calc__alias" type="text" aria-label="算式变量名" placeholder="变量名 A" />
+        <button
+          v-if="operand.alias.trim()"
+          type="button"
+          class="calc__insert"
+          :title="`把 ${operand.alias} 插入算式`"
+          @click="insertOperand(operand.alias)"
+        >插入</button>
         <button type="button" class="calc__del" aria-label="删除参与元素" @click="removeOperand(index)">×</button>
       </div>
       <div v-if="!draft.operands.length" class="calc__empty">还没有参与元素</div>
@@ -296,6 +357,42 @@ function clear(): void {
     <button type="button" class="calc__add" @click="addOperand">＋ 添加元素</button>
 
     <div class="calc__section">算式</div>
+    <div class="calc__builder">
+      <div class="calc__token-row">
+        <span class="calc__builder-label">点选元素</span>
+        <button
+          v-for="operand in draft.operands.filter((item) => item.alias.trim())"
+          :key="operand.alias"
+          type="button"
+          class="calc__chip"
+          :title="`插入 ${operand.alias}：${labelOf(operand.path) || operand.path}`"
+          @click="insertOperand(operand.alias)"
+        >{{ operand.alias }}</button>
+        <span v-if="!draft.operands.some((item) => item.alias.trim())" class="calc__builder-empty">
+          先在上方添加参与元素
+        </span>
+      </div>
+      <div class="calc__token-row">
+        <span class="calc__builder-label">运算符</span>
+        <button
+          v-for="button in FORMULA_OPERATOR_BUTTONS"
+          :key="button.value"
+          type="button"
+          class="calc__token"
+          @click="insertToken(button.value)"
+        >{{ button.label }}</button>
+      </div>
+      <div class="calc__token-row">
+        <span class="calc__builder-label">数字</span>
+        <button
+          v-for="number in FORMULA_NUMBER_BUTTONS"
+          :key="number"
+          type="button"
+          class="calc__token"
+          @click="insertToken(number)"
+        >{{ number }}</button>
+      </div>
+    </div>
     <textarea
       ref="formulaEl"
       v-model="draft.formula"
@@ -309,11 +406,11 @@ function clear(): void {
     </div>
 
     <div class="calc__fn-title">
-      <span class="calc__fn-label">高级函数（点击插入到光标处）</span>
+      <span class="calc__fn-label">高级函数（点函数名 → 填参数 → 插入算式）</span>
       <button
         type="button"
         class="calc__help-btn"
-        title="查看完整使用说明（通用规则 / 18 个函数 / 业务配方 / 排错）"
+        title="查看完整使用说明（通用规则 / 30 个函数 / 业务配方 / 排错）"
         aria-label="查看完整使用说明"
         @click="helpVisible = true"
       >?</button>
@@ -328,11 +425,33 @@ function clear(): void {
         :title="`${fn.signature} — ${fn.description}`"
         @mouseenter="activeFn = fn"
         @focus="activeFn = fn"
-        @click="insertFunction(fn.signature)"
+        @click="beginFunctionGuide(fn)"
       >
         {{ fn.name }}
       </button>
     </div>
+    <div v-if="guideFn" class="calc__guide">
+      <div class="calc__guide-head">
+        <b>{{ guideFn.name }}</b>
+        <span>逐项填入，或点选参与元素的别名</span>
+        <button type="button" class="calc__guide-close" aria-label="取消参数引导" @click="closeFunctionGuide">×</button>
+      </div>
+      <div v-for="(slot, index) in argSlots" :key="index" class="calc__guide-row">
+        <span class="calc__guide-label">{{ slot.label }}</span>
+        <input v-model="slot.value" class="calc__guide-input" type="text" :placeholder="slot.label" />
+        <select class="calc__guide-select" aria-label="从参与元素填入" @change="onSlotElementChange(index, $event)">
+          <option value="">从元素选…</option>
+          <option v-for="operand in draft.operands" :key="operand.path" :value="operand.path">
+            {{ operand.alias }} · {{ labelOf(operand.path) || operand.path }}
+          </option>
+        </select>
+      </div>
+      <div class="calc__guide-foot">
+        <button type="button" class="calc__guide-cancel" @click="closeFunctionGuide">取消</button>
+        <button type="button" class="calc__guide-ok" @click="insertGuidedFunction">插入到算式</button>
+      </div>
+    </div>
+
     <div v-if="activeFn" class="calc__fn-help">
       <div class="calc__fn-help-head">
         <code>{{ activeFn.signature }}</code>
@@ -689,5 +808,147 @@ function clear(): void {
 }
 .calc__spacer {
   flex: 1;
+}
+.calc__insert {
+  flex: none;
+  border: 1px solid var(--wb-line);
+  border-radius: 4px;
+  background: var(--wb-primary-soft);
+  padding: 3px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--wb-primary);
+  cursor: pointer;
+}
+.calc__insert:hover {
+  border-color: var(--wb-primary);
+}
+.calc__builder {
+  padding: 8px;
+  border: 1px solid var(--wb-line-soft);
+  border-radius: 8px;
+  background: var(--wb-bg);
+}
+.calc__token-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.calc__token-row:last-child {
+  margin-bottom: 0;
+}
+.calc__builder-label {
+  width: 56px;
+  flex: none;
+  font-size: 11px;
+  color: var(--wb-ink3);
+}
+.calc__chip,
+.calc__token {
+  border: 1px solid var(--wb-line);
+  border-radius: 4px;
+  background: #fff;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--wb-ink2);
+  cursor: pointer;
+}
+.calc__chip {
+  font-weight: 700;
+  color: var(--wb-primary);
+  background: var(--wb-primary-soft);
+  border-color: transparent;
+}
+.calc__chip:hover,
+.calc__token:hover {
+  border-color: var(--wb-primary);
+  color: var(--wb-primary);
+}
+.calc__builder-empty {
+  font-size: 11px;
+  color: var(--wb-ink3);
+}
+.calc__guide {
+  margin-top: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--wb-primary);
+  border-radius: 7px;
+  background: var(--wb-primary-soft);
+}
+.calc__guide-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+  font-size: 12px;
+  color: var(--wb-ink2);
+}
+.calc__guide-head b {
+  color: var(--wb-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.calc__guide-close {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  color: var(--wb-ink3);
+  cursor: pointer;
+}
+.calc__guide-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.calc__guide-label {
+  width: 108px;
+  flex: none;
+  font-size: 11.5px;
+  color: var(--wb-ink2);
+}
+.calc__guide-input,
+.calc__guide-select {
+  border: 1px solid var(--wb-line);
+  border-radius: 5px;
+  background: #fff;
+  padding: 4px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--wb-ink);
+  min-width: 0;
+}
+.calc__guide-input {
+  flex: 1 1 120px;
+}
+.calc__guide-select {
+  flex: 0 0 160px;
+}
+.calc__guide-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+.calc__guide-cancel,
+.calc__guide-ok {
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.calc__guide-cancel {
+  border: 1px solid var(--wb-line);
+  background: #fff;
+  color: var(--wb-ink2);
+}
+.calc__guide-ok {
+  border: 1px solid var(--wb-primary);
+  background: var(--wb-primary);
+  color: #fff;
 }
 </style>

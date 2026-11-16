@@ -11,11 +11,16 @@ import {
   CALCULATION_ALIASES,
   CONDITION_MODE_OPTIONS,
   CONDITION_OPERATOR_OPTIONS,
+  FORMULA_NUMBER_BUTTONS,
+  FORMULA_OPERATOR_BUTTONS,
+  buildFunctionCall,
   calculationFunctionGroups,
   collectCalculationTargets,
   collectConditionElements,
   evaluateCalculation,
   findLocation,
+  functionArgSlots,
+  insertFormulaToken,
   setByPath,
   validateCalculationConfig,
   validateCalculationFormula,
@@ -29,6 +34,7 @@ import type {
   ConditionMode,
   ConditionOperator,
   ConditionRow,
+  FunctionArgHint,
   Scope,
 } from "@x-ac/web-design-core";
 import { useDesigner } from "../context";
@@ -119,8 +125,11 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
   const initial = findLocation(state.page.children ?? [], target.nodeId)?.node?.calculation;
   const [draft, setDraft] = useState<Draft>(() => normalize(initial));
   const formulaRef = useRef<HTMLTextAreaElement | null>(null);
-  /** 当前查看说明的函数；悬停 / 聚焦时切换，点击按钮仍只负责插入签名 */
+  /** 当前查看说明的函数；悬停 / 聚焦时切换 */
   const [activeFn, setActiveFn] = useState<CalculationFunction | null>(null);
+  /** 正在做参数引导的函数（与悬停说明卡分开） */
+  const [guideFn, setGuideFn] = useState<CalculationFunction | null>(null);
+  const [argSlots, setArgSlots] = useState<Array<FunctionArgHint & { value: string }>>([]);
   /** 完整使用说明（内容较长，单独一层弹窗承载） */
   const [helpVisible, setHelpVisible] = useState(false);
 
@@ -206,23 +215,67 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
       : `试算结果：${String(outcome.value)}（每个参与元素按 1 代入）`;
   })();
 
-  function insertFunction(signature: string): void {
+  /** 把 token 插到算式光标处；textarea 没有焦点时追加到末尾 */
+  function insertToken(token: string): void {
     const element = formulaRef.current;
     const text = draft.formula;
-    if (!element) {
-      patch({ formula: text.trim() ? `${text.trim()} + ${signature}` : signature });
-      return;
-    }
-    const start = element.selectionStart ?? text.length;
-    const end = element.selectionEnd ?? start;
-    patch({ formula: text.slice(0, start) + signature + text.slice(end) });
+    const start = element?.selectionStart ?? text.length;
+    const end = element?.selectionEnd ?? start;
+    const result = insertFormulaToken(text, token, start, end);
+    patch({ formula: result.formula });
     const placeCursor = () => {
-      element.focus();
-      element.setSelectionRange(start + signature.length, start + signature.length);
+      const el = formulaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(result.cursor, result.cursor);
     };
     // jsdom / SSR 环境不一定有 rAF，退化到 microtask 即可
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(placeCursor);
     else void Promise.resolve().then(placeCursor);
+  }
+
+  /** Excel 式点选引用：点元素就把别名写进算式 */
+  function insertOperand(alias: string): void {
+    if (alias.trim()) insertToken(alias.trim());
+  }
+
+  /** 点函数名：打开参数引导；无参函数直接插入调用 */
+  function beginFunctionGuide(fn: CalculationFunction): void {
+    const slots = functionArgSlots(fn);
+    if (!slots.length) {
+      insertToken(buildFunctionCall(fn.name, []));
+      return;
+    }
+    setGuideFn(fn);
+    setArgSlots(slots.map((slot) => ({ ...slot, value: slot.default ?? "" })));
+  }
+
+  function closeFunctionGuide(): void {
+    setGuideFn(null);
+    setArgSlots([]);
+  }
+
+  function updateArgSlot(index: number, value: string): void {
+    setArgSlots((current) => current.map((slot, i) => (i === index ? { ...slot, value } : slot)));
+  }
+
+  /** 参数槽里点选元素：把别名填进当前槽 */
+  function setSlotFromElement(index: number, path: string): void {
+    const alias = draft.operands.find((operand) => operand.path === path)?.alias;
+    if (alias?.trim()) updateArgSlot(index, alias.trim());
+    else notify("请先在上方的参与元素中加入该元素", "error");
+  }
+
+  /** 参数填完 → 拼成调用文本插进算式 */
+  function insertGuidedFunction(): void {
+    if (!guideFn) return;
+    const values = argSlots.map((slot) => slot.value.trim());
+    if (values.some((value) => !value)) {
+      notify("请先填完每个参数，或点元素填入别名", "error");
+      return;
+    }
+    insertToken(buildFunctionCall(guideFn.name, values));
+    closeFunctionGuide();
   }
 
   function save(): void {
@@ -317,6 +370,16 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
               value={operand.alias}
               onChange={(event) => updateOperand(index, { alias: event.target.value })}
             />
+            {operand.alias.trim() ? (
+              <button
+                type="button"
+                className="calc__insert"
+                title={`把 ${operand.alias} 插入算式`}
+                onClick={() => insertOperand(operand.alias)}
+              >
+                插入
+              </button>
+            ) : null}
             <button
               type="button"
               className="calc__del"
@@ -340,6 +403,48 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
       </button>
 
       <div className="calc__section">算式</div>
+      <div className="calc__builder">
+        <div className="calc__token-row">
+          <span className="calc__builder-label">点选元素</span>
+          {draft.operands
+            .filter((operand) => operand.alias.trim())
+            .map((operand) => (
+              <button
+                type="button"
+                key={operand.alias}
+                className="calc__chip"
+                title={`插入 ${operand.alias}：${labelOf(operand.path) || operand.path}`}
+                onClick={() => insertOperand(operand.alias)}
+              >
+                {operand.alias}
+              </button>
+            ))}
+          {!draft.operands.some((operand) => operand.alias.trim()) ? (
+            <span className="calc__builder-empty">先在上方添加参与元素</span>
+          ) : null}
+        </div>
+        <div className="calc__token-row">
+          <span className="calc__builder-label">运算符</span>
+          {FORMULA_OPERATOR_BUTTONS.map((button) => (
+            <button
+              type="button"
+              key={button.value}
+              className="calc__token"
+              onClick={() => insertToken(button.value)}
+            >
+              {button.label}
+            </button>
+          ))}
+        </div>
+        <div className="calc__token-row">
+          <span className="calc__builder-label">数字</span>
+          {FORMULA_NUMBER_BUTTONS.map((number) => (
+            <button type="button" key={number} className="calc__token" onClick={() => insertToken(number)}>
+              {number}
+            </button>
+          ))}
+        </div>
+      </div>
       <textarea
         ref={formulaRef}
         className="calc__formula wb-mono"
@@ -354,11 +459,11 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
       </div>
 
       <div className="calc__fn-title">
-        <span className="calc__fn-label">高级函数（点击插入到光标处）</span>
+        <span className="calc__fn-label">高级函数（点函数名 → 填参数 → 插入算式）</span>
         <button
           type="button"
           className="calc__help-btn"
-          title="查看完整使用说明（通用规则 / 18 个函数 / 业务配方 / 排错）"
+          title="查看完整使用说明（通用规则 / 30 个函数 / 业务配方 / 排错）"
           aria-label="查看完整使用说明"
           onClick={() => setHelpVisible(true)}
         >
@@ -376,13 +481,68 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
               title={`${fn.signature} — ${fn.description}`}
               onMouseEnter={() => setActiveFn(fn)}
               onFocus={() => setActiveFn(fn)}
-              onClick={() => insertFunction(fn.signature)}
+              onClick={() => beginFunctionGuide(fn)}
             >
               {fn.name}
             </button>
           ))}
         </div>
       ))}
+
+      {guideFn ? (
+        <div className="calc__guide" key={guideFn.name}>
+          <div className="calc__guide-head">
+            <b>{guideFn.name}</b>
+            <span>逐项填入，或点选参与元素的别名</span>
+            <button
+              type="button"
+              className="calc__guide-close"
+              aria-label="取消参数引导"
+              onClick={closeFunctionGuide}
+            >
+              ×
+            </button>
+          </div>
+          {argSlots.map((slot, index) => (
+            <div className="calc__guide-row" key={`${guideFn.name}-${index}`}>
+              <span className="calc__guide-label">{slot.label}</span>
+              <input
+                className="calc__guide-input"
+                type="text"
+                placeholder={slot.label}
+                value={slot.value}
+                onChange={(event) => updateArgSlot(index, event.target.value)}
+              />
+              <select
+                className="calc__guide-select"
+                aria-label="从参与元素填入"
+                defaultValue=""
+                onChange={(event) => {
+                  if (event.target.value) {
+                    setSlotFromElement(index, event.target.value);
+                    event.target.value = "";
+                  }
+                }}
+              >
+                <option value="">从元素选…</option>
+                {draft.operands.map((operand) => (
+                  <option key={operand.path} value={operand.path}>
+                    {operand.alias} · {labelOf(operand.path) || operand.path}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+          <div className="calc__guide-foot">
+            <button type="button" className="calc__guide-cancel" onClick={closeFunctionGuide}>
+              取消
+            </button>
+            <button type="button" className="calc__guide-ok" onClick={insertGuidedFunction}>
+              插入到算式
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {activeFn ? (
         <div className="calc__fn-help">
