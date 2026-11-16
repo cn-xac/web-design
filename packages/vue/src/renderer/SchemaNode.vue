@@ -449,11 +449,11 @@ function selectSelf(): void {
       :style="mergedStyle"
     >
       <template v-if="slotText !== null">{{ slotText }}</template>
-      <!-- 普通容器 / 数据驱动推导树。
-           pane 类物料（paneSlotKey）的 children 也走默认 slot：
-           物料组件自己按 child.props.node.props[paneSlotKey] 分组到各页签，
-           避免 v-for + 动态插槽名触发 Vue 3.5 编译器 bug。 -->
-      <template v-if="material?.acceptsChildren">
+      <!-- 普通容器 / 数据驱动推导树 / pane 类物料（paneSlotKey）。
+           pane 类物料（如 tabs）自身不开 acceptsChildren（防止往它整体上落点产生
+           无归属节点），但它的 children 是各页签的 pane 容器，必须渲染进默认 slot，
+           由物料按 child.props.node.props[paneSlotKey] 分组到各页签。 -->
+      <template v-if="material?.acceptsChildren || material?.paneSlotKey">
         <SchemaNode
           v-for="child in renderChildren"
           :key="child.id"

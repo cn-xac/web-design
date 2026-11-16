@@ -12,6 +12,7 @@
 import type { ActionSchema, DeviceType, NodeSchema, PageSchema } from "../schema/types";
 import { createEmptyPage } from "../schema/types";
 import type { TabItem } from "../materials/parse";
+import { parseTabItems } from "../materials/parse";
 import { migrateTextPanes, syncTabPanes } from "../schema/tabs";
 import type { ExternalDataSource } from "../data/external";
 import type { VisibilityConfig } from "../visibility/types";
@@ -29,6 +30,7 @@ import {
   moveNode,
   relocateNode,
   removeNode,
+  walk,
   type DropPosition,
   type NodeLocation,
 } from "../schema/tree";
@@ -218,6 +220,7 @@ export class DesignerStore {
 
     this.page = clone(record.schema);
     this.page.children = this.page.children ?? [];
+    this.normalizeTabPanes(this.page);
     this.selectedId = null;
     this.history = [];
     this.future = [];
@@ -229,11 +232,25 @@ export class DesignerStore {
 
   setPage(next: PageSchema): void {
     this.page = clone(next);
+    this.normalizeTabPanes(this.page);
     this.selectedId = null;
     this.lastSavedSnapshot = JSON.stringify(this.page);
     this.history = [];
     this.future = [];
     this.emit();
+  }
+
+  /**
+   * 打开页面时的结构升级：给所有 pane 类物料按 items 补齐 pane 容器。
+   * 幂等；只补缺失的容器，不碰已有内容。避免本期之前创建的标签页打开后无法拖入。
+   */
+  private normalizeTabPanes(page: PageSchema): void {
+    walk(page.children, (node) => {
+      const material = this.materialOf(node.component);
+      if (!material?.paneSlotKey) return;
+      const items = parseTabItems(node.props?.items);
+      if (items.length) syncTabPanes(node, items);
+    });
   }
 
   save(): boolean {
@@ -281,6 +298,13 @@ export class DesignerStore {
     if (!material) return null;
     const node: NodeSchema = { id: createNodeId(), component, props: {} };
     if (material.acceptsChildren) node.children = [];
+    // pane 类物料（如标签页）：按默认 items 预建各页签的 pane 容器，
+    // 否则新建出来的标签页没有可拖入的内容区域。
+    if (material.paneSlotKey) {
+      const items = parseTabItems(material.defaultProps?.items);
+      node.children = [];
+      if (items.length) syncTabPanes(node, items);
+    }
     return node;
   }
 
@@ -648,6 +672,7 @@ export class DesignerStore {
   replaceWith(next: PageSchema): void {
     this.pushHistory();
     this.page = clone(next);
+    this.normalizeTabPanes(this.page);
     this.selectedId = null;
     this.emit();
   }
