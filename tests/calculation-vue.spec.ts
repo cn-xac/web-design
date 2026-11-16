@@ -148,19 +148,34 @@ describe("Vue 设计器：数据计算弹窗", () => {
     wrapper.unmount();
   });
 
-  it("插入函数按钮把签名写进算式；移除计算按钮删除配置", async () => {
+  it("点选元素/运算符与函数参数引导把内容写进算式；移除计算按钮删除配置", async () => {
     const { wrapper, store } = await mountDesigner();
     await openCalculationDialog(wrapper);
     await wrapper.find(".calc__element").setValue("form.f2");
 
+    // Excel 式点选：点元素别名与运算符，算式自动拼接并补空格
+    await wrapper.findAll(".calc__chip").find((button) => button.text() === "A")!.trigger("click");
+    await tick();
+    await wrapper.findAll(".calc__token").find((button) => button.text() === "+")!.trigger("click");
+    await tick();
+    expect((wrapper.find(".calc__formula").element as HTMLTextAreaElement).value).toContain("A + ");
+
+    // 点函数走参数引导，填完槽才插入调用
     const sumButton = wrapper.findAll(".calc__fn").find((button) => button.text() === "SUM");
-    expect(sumButton).toBeTruthy();
     await sumButton!.trigger("click");
-    expect((wrapper.find(".calc__formula").element as HTMLTextAreaElement).value).toContain("SUM(");
+    expect(wrapper.find(".calc__guide").exists()).toBe(true);
+    const slots = wrapper.findAll(".calc__guide-input");
+    expect(slots).toHaveLength(2);
+    await slots[0].setValue("A");
+    await slots[1].setValue("1");
+    await wrapper.find(".calc__guide-ok").trigger("click");
+    await tick();
+    expect((wrapper.find(".calc__formula").element as HTMLTextAreaElement).value).toContain("SUM(A, 1)");
+    expect(wrapper.find(".calc__guide").exists()).toBe(false);
 
     await wrapper.find(".calc__ok").trigger("click");
     await tick();
-    expect(store.page.children[0].calculation?.formula).toContain("SUM(");
+    expect(store.page.children[0].calculation?.formula).toContain("SUM(A, 1)");
 
     await openCalculationDialog(wrapper);
     await wrapper.find(".calc__clear").trigger("click");
@@ -200,7 +215,7 @@ describe("Vue 设计器：数据计算弹窗", () => {
     // 说明弹窗 Teleport 到 body，用 document 查询而不是 wrapper.find
     const help = document.body.querySelector(".calc__help");
     expect(help).toBeTruthy();
-    expect(document.body.querySelectorAll(".calc__help-fn")).toHaveLength(18);
+    expect(document.body.querySelectorAll(".calc__help-fn")).toHaveLength(30);
     expect(help!.textContent).toContain("一、通用规则");
     expect(help!.textContent).toContain("二、函数参考");
     expect(help!.textContent).toContain("三、常见业务配方");

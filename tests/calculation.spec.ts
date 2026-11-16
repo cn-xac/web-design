@@ -4,13 +4,17 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  CALCULATION_AGGREGATES,
   CALCULATION_FUNCTIONS,
   CALCULATION_FUNCTION_MAP,
   CALCULATION_RECIPES,
   CALCULATION_TROUBLESHOOTING,
   CALCULATION_USAGE_NOTES,
+  FORMULA_OPERATOR_BUTTONS,
   SCHEMA_VERSION,
+  aggregateSeries,
   applyCalculations,
+  buildFunctionCall,
   canOwnCalculation,
   collectCalculationTargets,
   collectSpecialSettings,
@@ -18,6 +22,8 @@ import {
   evaluate,
   evaluateCalculation,
   evaluateWithFunctions,
+  functionArgSlots,
+  insertFormulaToken,
   migratePage,
   toJSON,
   validateCalculationConfig,
@@ -83,10 +89,10 @@ describe("受限表达式：只有显式注入白名单才允许函数调用", (
 });
 
 describe("高级函数白名单", () => {
-  it("18 个函数全部有签名、参数、返回、示例与说明，且分组齐全", () => {
-    expect(CALCULATION_FUNCTIONS).toHaveLength(18);
+  it("30 个函数全部有签名、参数、返回、示例与说明，且分组齐全", () => {
+    expect(CALCULATION_FUNCTIONS).toHaveLength(30);
     expect(new Set(CALCULATION_FUNCTIONS.map((fn) => fn.group))).toEqual(
-      new Set(["聚合", "数学", "逻辑与文本"]),
+      new Set(["聚合", "数学", "逻辑与文本", "日期"]),
     );
     // 设计器的函数说明卡与手册都以这份元数据为唯一来源
     expect(
@@ -95,8 +101,9 @@ describe("高级函数白名单", () => {
       ),
     ).toBe(true);
     expect(CALCULATION_FUNCTIONS.filter((fn) => fn.group === "聚合")).toHaveLength(6);
-    expect(CALCULATION_FUNCTIONS.filter((fn) => fn.group === "数学")).toHaveLength(7);
-    expect(CALCULATION_FUNCTIONS.filter((fn) => fn.group === "逻辑与文本")).toHaveLength(5);
+    expect(CALCULATION_FUNCTIONS.filter((fn) => fn.group === "数学")).toHaveLength(9);
+    expect(CALCULATION_FUNCTIONS.filter((fn) => fn.group === "逻辑与文本")).toHaveLength(13);
+    expect(CALCULATION_FUNCTIONS.filter((fn) => fn.group === "日期")).toHaveLength(2);
   });
 
   it("聚合 / 数学函数结果正确，数组会展开", () => {
@@ -333,7 +340,7 @@ describe("协议校验与落库", () => {
     expect(validateCalculationConfig(config({ precision: 20 }))).toContain("小数位必须是 0~10 的数字");
     expect(
       validateCalculationConfig(config({ operands: [{ alias: "A", path: "form.a", aggregate: "median" as "sum" }] })),
-    ).toContain("参与元素 1 的聚合口径只支持 sum / avg / min / max");
+    ).toContain("参与元素 1 的聚合口径只支持 sum / avg / min / max / text");
     expect(
       validateCalculationConfig(config({ operands: [{ alias: "A", path: "form.n_total" }] }), "form.n_total"),
     ).toContain("参与元素 1 不能引用当前元素自身");
@@ -369,5 +376,128 @@ describe("协议校验与落库", () => {
     const targets = collectCalculationTargets(pageWith(config()));
     expect(targets).toHaveLength(1);
     expect(targets[0]).toMatchObject({ nodeId: "n_total", path: "form.n_total" });
+  });
+});
+
+describe("数值优先的混编运算（仅计算通道）", () => {
+  const run = (expression: string) => evaluateWithFunctions(expression, {}, CALCULATION_FUNCTION_MAP);
+
+  it("纯数字字符串参与算术时按数值处理", () => {
+    expect(run("'12' + 3")).toBe(15);
+    expect(run("'12' - 3")).toBe(9);
+    expect(run("'12' * '3'")).toBe(36);
+    expect(run("'12' / '4'")).toBe(3);
+    expect(run("'7' % '4'")).toBe(3);
+    expect(run("-'12'")).toBe(-12);
+    expect(run("+'12'")).toBe(12);
+  });
+
+  it("比较运算优先按数值比", () => {
+    expect(run("'12' > 3")).toBe(true);
+    expect(run("'2' > 10")).toBe(false);
+    expect(run("'12' >= 12")).toBe(true);
+    expect(run("'3' <= '3'")).toBe(true);
+  });
+
+  it("转不成数值时 + 回落拼接，其它算术返回空", () => {
+    expect(run("'abc' + 3")).toBe("abc3");
+    expect(run("'abc' * 3")).toBeUndefined();
+    expect(run("'' + 3")).toBe("3");
+  });
+
+  it("参与元素来自输入框的字符串数字也能相加", () => {
+    const page = pageWith(config({ formula: "A + B" }));
+    const scope = { form: { n_price: "12", n_qty: "3", n_total: 0 } };
+    expect(applyCalculations(page, scope)[0].value).toBe(15);
+  });
+
+  it("通用 {{}} 表达式保持原严格语义，不受计算通道影响", () => {
+    expect(evaluate("'12' + 3")).toBe("123");
+    expect(evaluate("'12' * 3")).toBeUndefined();
+  });
+});
+
+describe("子表单文本聚合", () => {
+  const scope = {
+    form: {
+      rows: [{ name: "张三" }, { name: "李四" }, { name: "" }, { name: "王五" }],
+    },
+  };
+
+  it("聚合口径清单含文本", () => {
+    expect(CALCULATION_AGGREGATES.some((option) => option.value === "text")).toBe(true);
+  });
+
+  it("按行拼接非空值，默认换行分隔", () => {
+    expect(aggregateSeries(["张三", "李四", "", "王五"], "text")).toBe("张三\n李四\n王五");
+    expect(aggregateSeries(["单个"], "text")).toBe("单个");
+  });
+
+  it("计算配置可用 text 聚合子表单列", () => {
+    const operand = { alias: "A", path: "form.rows[0].name", aggregate: "text" as const };
+    const outcome = evaluateCalculation(config({ operands: [operand], formula: "A" }), scope, 0);
+    expect(outcome.value).toBe("张三\n李四\n王五");
+  });
+});
+
+describe("新增 Excel 常用函数", () => {
+  const run = (expression: string) => evaluateWithFunctions(expression, {}, CALCULATION_FUNCTION_MAP);
+
+  it("定向舍入、错误兜底与格式文本", () => {
+    expect(run("ROUNDUP(1.21, 1)")).toBe(1.3);
+    expect(run("ROUNDUP(-1.21, 1)")).toBe(-1.3);
+    expect(run("ROUNDDOWN(1.29, 1)")).toBe(1.2);
+    expect(run("ROUNDDOWN(-1.29, 1)")).toBe(-1.2);
+    expect(run("IFERROR(1 / 0, 0)")).toBe(0);
+    expect(run("IFERROR(3, 0)")).toBe(3);
+    expect(run("TEXT(12.5, '0.00')")).toBe("12.50");
+    expect(run("TEXT(1234567.891, '#,##0.00')")).toBe("1,234,567.89");
+    expect(run("TEXT(0.125, '0.0%')")).toBe("12.5%");
+  });
+
+  it("文本截取与清理", () => {
+    expect(run("LEFT('abcdef', 2)")).toBe("ab");
+    expect(run("RIGHT('abcdef', 2)")).toBe("ef");
+    expect(run("MID('abcdef', 2, 3)")).toBe("bcd");
+    expect(run("TRIM('  a   b ')")).toBe("a b");
+    expect(run("UPPER('abc')")).toBe("ABC");
+    expect(run("LOWER('ABC')")).toBe("abc");
+  });
+
+  it("日期函数返回可解析文本，并能再格式化", () => {
+    const today = run("TODAY()") as string;
+    expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(run("NOW()")).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+    expect(run(`TEXT('${today}', 'yyyy年m月d日')`)).toBe(
+      `${Number(today.slice(0, 4))}年${Number(today.slice(5, 7))}月${Number(today.slice(8, 10))}日`,
+    );
+  });
+});
+
+describe("算式点击构建纯函数", () => {
+  it("运算符插入自动补空格，已有空格不重复", () => {
+    expect(insertFormulaToken("A", "+", 1)).toEqual({ formula: "A + ", cursor: 4 });
+    expect(insertFormulaToken("A + ", "B", 4)).toEqual({ formula: "A + B", cursor: 5 });
+    expect(insertFormulaToken("A ", "+", 2)).toEqual({ formula: "A + ", cursor: 4 });
+    expect(insertFormulaToken("A", "(", 1)).toEqual({ formula: "A(", cursor: 2 });
+  });
+
+  it("选中文本时插入会替换选区", () => {
+    expect(insertFormulaToken("A + B", "C", 4, 5)).toEqual({ formula: "A + C", cursor: 5 });
+  });
+
+  it("参数槽来自统一提示表，拼成合法调用", () => {
+    const round = CALCULATION_FUNCTIONS.find((fn) => fn.name === "ROUND")!;
+    expect(functionArgSlots(round).map((slot) => slot.default)).toEqual([undefined, "2"]);
+    expect(buildFunctionCall("round", ["A", "2"])).toBe("ROUND(A, 2)");
+    const today = CALCULATION_FUNCTIONS.find((fn) => fn.name === "TODAY")!;
+    expect(functionArgSlots(today)).toEqual([]);
+    expect(buildFunctionCall("TODAY", [])).toBe("TODAY()");
+  });
+
+  it("运算符按钮覆盖常用运算", () => {
+    const values = FORMULA_OPERATOR_BUTTONS.map((button) => button.value);
+    expect(values).toEqual(expect.arrayContaining(["+", "-", "*", "/", "%", "(", ")", ",", "?", ":"]));
+    expect(validateCalculationFormula("A + B * 2 > 3 && C")).toBeNull();
   });
 });

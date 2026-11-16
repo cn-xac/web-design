@@ -230,7 +230,7 @@ describe("React 设计器：数据计算弹窗", () => {
       // 说明弹窗 createPortal 到 body，用 document 查询
       const help = document.body.querySelector(".calc__help");
       expect(help).toBeTruthy();
-      expect(document.body.querySelectorAll(".calc__help-fn")).toHaveLength(18);
+      expect(document.body.querySelectorAll(".calc__help-fn")).toHaveLength(30);
       expect(help?.textContent).toContain("一、通用规则");
       expect(help?.textContent).toContain("三、常见业务配方");
       expect(help?.textContent).toContain("四、限制与排错");
@@ -275,26 +275,49 @@ describe("React 设计器：数据计算弹窗", () => {
     }
   });
 
-  it("函数按钮插入签名；移除计算后配置消失", async () => {
+  it("点选元素/运算符与函数参数引导把内容写进算式；移除计算后配置消失", async () => {
     const ui = setup(
       pageWith([
         { id: "f1", component: "text", props: { label: "合计" } },
         { id: "f2", component: "number", props: { label: "数量" } },
       ]),
     );
+    const flush = () => act(async () => { await Promise.resolve(); });
     try {
       await ui.render();
       await ui.select("f1");
       await openCalculationDialog(ui.container);
       await setNativeValue(ui.container.querySelector(".calc__element") as HTMLSelectElement, "form.f2");
 
+      // Excel 式点选：点元素别名与运算符，算式自动拼接并补空格
+      const chip = [...ui.container.querySelectorAll<HTMLElement>(".calc__chip")].find(
+        (button) => button.textContent?.trim() === "A",
+      );
+      await click(chip);
+      await flush();
+      const plus = [...ui.container.querySelectorAll<HTMLElement>(".calc__token")].find(
+        (button) => button.textContent?.trim() === "+",
+      );
+      await click(plus);
+      await flush();
+      expect((ui.container.querySelector(".calc__formula") as HTMLTextAreaElement).value).toContain("A + ");
+
+      // 点函数走参数引导，填完槽才插入调用
       const sum = [...ui.container.querySelectorAll<HTMLElement>(".calc__fn")].find(
         (button) => button.textContent?.trim() === "SUM",
       );
-      expect(sum).toBeTruthy();
       await click(sum);
+      const slots = ui.container.querySelectorAll<HTMLInputElement>(".calc__guide-input");
+      expect(slots).toHaveLength(2);
+      await setNativeValue(slots[0], "A");
+      await setNativeValue(slots[1], "1");
+      await click(ui.container.querySelector(".calc__guide-ok"));
+      await flush();
+      expect((ui.container.querySelector(".calc__formula") as HTMLTextAreaElement).value).toContain("SUM(A, 1)");
+      expect(ui.container.querySelector(".calc__guide")).toBeNull();
+
       await click(ui.container.querySelector(".calc__ok"));
-      expect(ui.nodeOf("f1")?.calculation?.formula).toContain("SUM(");
+      expect(ui.nodeOf("f1")?.calculation?.formula).toContain("SUM(A, 1)");
 
       await openCalculationDialog(ui.container);
       await click(ui.container.querySelector(".calc__clear"));
