@@ -5,7 +5,9 @@ import {
   applyExternalFill,
   collectBindableElements,
   collectExternalSources,
+  decideExternalTrigger,
   deepClone,
+  externalDebounceMs,
   getByPath,
   loadExternalSource,
   loadExternalSources,
@@ -77,7 +79,14 @@ export function usePageStore(page: PageSchema, seed?: Record<string, unknown>): 
 
   /** 外部数据源（rg4KCt）：输入达到「触发长度」才发请求 */
   const lastTriggered = useRef(new Map<string, string>());
+  /** 每个触发源一个防抖定时器：逐字输入合并为末次请求 */
+  const debounceTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const controllerRef = useRef<AbortController | null>(null);
+
+  function clearTriggerTimers(): void {
+    debounceTimers.current.forEach((timer) => clearTimeout(timer));
+    debounceTimers.current.clear();
+  }
 
   useEffect(() => {
     const sources = collectExternalSources(pageRef.current).filter(
@@ -93,23 +102,35 @@ export function usePageStore(page: PageSchema, seed?: Record<string, unknown>): 
       const path = source.triggerPath ?? (node ? elementPaths.get(node.id) ?? "" : "");
       if (!path) continue;
       const raw = getByPath(scopeRef.current, path);
-      const threshold = Number(source.triggerLength ?? 0);
-      const text = raw === null || raw === undefined ? "" : String(raw);
-      const key = `${source.url}|${path}|${threshold}`;
-      if (text.length < threshold) {
-        // 低于阈值（如清空）：清掉判重记录，否则重新输入同一关键词会因判重而不请求
+      const key = `${source.id}|${source.url}|${path}`;
+      const decision = decideExternalTrigger(source, lastTriggered.current.get(key), raw);
+
+      if (decision.reason === "below-threshold") {
         lastTriggered.current.delete(key);
+        const timer = debounceTimers.current.get(key);
+        if (timer !== undefined) {
+          clearTimeout(timer);
+          debounceTimers.current.delete(key);
+        }
         continue;
       }
-      if (lastTriggered.current.get(key) === text) continue;
-      lastTriggered.current.set(key, text);
-      void loadExternalSource(source, scopeRef.current, {
-        signal: controllerRef.current?.signal,
-        ownerPath: path,
-        onError: (message) => {
-          if (message) setDataError(message);
-        },
-      }).then(() => force());
+      if (!decision.shouldFetch) continue;
+
+      // 防抖：逐字输入只保留末次调度，延时到达才真正发请求。
+      const prev = debounceTimers.current.get(key);
+      if (prev !== undefined) clearTimeout(prev);
+      const timer = setTimeout(() => {
+        debounceTimers.current.delete(key);
+        lastTriggered.current.set(key, decision.text);
+        void loadExternalSource(source, scopeRef.current, {
+          signal: controllerRef.current?.signal,
+          ownerPath: path,
+          onError: (message) => {
+            if (message) setDataError(message);
+          },
+        }).then(() => force());
+      }, externalDebounceMs(source));
+      debounceTimers.current.set(key, timer);
     }
   }, [version]);
 
@@ -144,10 +165,12 @@ export function usePageStore(page: PageSchema, seed?: Record<string, unknown>): 
     setErrors({});
     const controller = new AbortController();
     controllerRef.current = controller;
+    clearTriggerTimers();
     lastTriggered.current.clear();
     void load(controller.signal);
     force();
     return () => {
+      clearTriggerTimers();
       controller.abort();
       controllerRef.current = null;
     };

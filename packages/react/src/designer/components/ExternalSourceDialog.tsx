@@ -70,6 +70,8 @@ interface Draft {
   headers: Record<string, string>;
   once: boolean;
   triggerLength: number;
+  /** 防抖延时（毫秒）；空字符串 = 用运行时默认 300ms */
+  debounceMs: number | "";
   /** 列表字段：数据源级统一配置（一次响应只有一个数组，各映射都基于它逐项生成） */
   listField: string;
   params: DraftParam[];
@@ -143,6 +145,7 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
       headers: { ...(source?.headers ?? {}) },
       once: source?.once !== false,
       triggerLength: Number(source?.triggerLength ?? 0),
+      debounceMs: typeof source?.debounceMs === "number" ? source.debounceMs : "",
       // 兼容旧数据：数据源级没写时，取第一条映射上的列表字段提升到顶层
       listField: source?.listField ?? saved.find((item) => item.listField)?.listField ?? "",
       params: (source?.params ?? []).map((item) => ({ ...item })),
@@ -439,7 +442,11 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
     if (responses.length) source.responses = responses;
 
     source.once = draft.once;
-    if (draft.triggerLength > 0) source.triggerLength = draft.triggerLength;
+    if (draft.triggerLength > 0) {
+      source.triggerLength = draft.triggerLength;
+      // 防抖延时仅对触发型数据源有意义；留空则交给运行时默认（300ms）
+      if (draft.debounceMs !== "") source.debounceMs = Number(draft.debounceMs) || 0;
+    }
     return source;
   };
 
@@ -560,6 +567,28 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
             <div className="ext__static" title={boundPath}>
               {boundLabel}
             </div>
+          </div>
+        </div>
+        <div className="ext__row ext__row--split">
+          <div className="ext__cell">
+            <label className="ext__label">防抖延时（毫秒）</label>
+            <input
+              className="ext__input"
+              type="number"
+              min={0}
+              value={draft.debounceMs}
+              placeholder="默认 300"
+              disabled={draft.triggerLength <= 0}
+              onChange={(event) =>
+                patchDraft({
+                  debounceMs: event.target.value === "" ? "" : Number(event.target.value) || 0,
+                })
+              }
+            />
+          </div>
+          <div className="ext__cell ext__cell--grow">
+            <label className="ext__label">&nbsp;</label>
+            <div className="ext__static">输入停止后再请求；0 = 不防抖</div>
           </div>
         </div>
         <div className="ext__note">

@@ -80,6 +80,8 @@ const draft = reactive({
   headers: {} as Record<string, string>,
   once: true,
   triggerLength: 0,
+  // 触发型数据源的防抖延时（毫秒）：逐字输入合并为末次请求；空表示用默认 300ms
+  debounceMs: "" as number | "",
   // 列表字段：数据源级统一配置（一次响应只有一个数组，各映射都基于它逐项生成）
   listField: "",
   params: [] as DraftParam[],
@@ -232,6 +234,7 @@ function reset(): void {
     headers: { ...(source?.headers ?? {}) },
     once: source?.once !== false,
     triggerLength: Number(source?.triggerLength ?? 0),
+    debounceMs: typeof source?.debounceMs === "number" ? source.debounceMs : "",
     // 兼容旧数据：数据源级没写时，取第一条映射上的列表字段提升到顶层
     listField: source?.listField ?? saved.find((r) => r.listField)?.listField ?? "",
     params: (source?.params ?? []).map((item) => ({ ...item })),
@@ -475,6 +478,8 @@ function buildSource(): ExternalDataSource {
   source.once = draft.once;
   if (draft.triggerLength > 0) {
     source.triggerLength = draft.triggerLength;
+    // 防抖延时仅对触发型数据源有意义；留空则交给运行时默认（300ms）
+    if (draft.debounceMs !== "") source.debounceMs = Number(draft.debounceMs) || 0;
   }
   return source;
 }
@@ -567,6 +572,23 @@ function remove(): void {
         <div class="ext__cell ext__cell--grow">
           <label class="ext__label">触发元素</label>
           <div class="ext__static" :title="boundPath">{{ boundLabel }}</div>
+        </div>
+      </div>
+      <div class="ext__row ext__row--split">
+        <div class="ext__cell">
+          <label class="ext__label">防抖延时（毫秒）</label>
+          <input
+            v-model.number="draft.debounceMs"
+            class="ext__input"
+            type="number"
+            min="0"
+            placeholder="默认 300"
+            :disabled="draft.triggerLength <= 0"
+          />
+        </div>
+        <div class="ext__cell ext__cell--grow">
+          <label class="ext__label">&nbsp;</label>
+          <div class="ext__static">输入停止后再请求；0 = 不防抖</div>
         </div>
       </div>
       <div class="ext__note">

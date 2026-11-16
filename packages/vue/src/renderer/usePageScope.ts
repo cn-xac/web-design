@@ -5,7 +5,9 @@ import {
   applyExternalFill,
   collectBindableElements,
   collectExternalSources,
+  decideExternalTrigger,
   deepClone,
+  externalDebounceMs,
   getByPath,
   loadExternalSource,
   loadExternalSources,
@@ -101,6 +103,16 @@ export function usePageScope(
 
   /** 同一个值不重复触发：用户每敲一个字都会触发 watcher */
   const lastTriggered = new Map<string, string>();
+  /** 每个触发源一个防抖定时器：逐字输入合并为末次请求，避免「输入就打接口」 */
+  const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  function clearTriggerTimer(key: string): void {
+    const timer = debounceTimers.get(key);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      debounceTimers.delete(key);
+    }
+  }
 
   watch(
     () => triggerPaths.value.map((path) => (path ? getByPath(scope, path) : undefined)),
@@ -108,23 +120,31 @@ export function usePageScope(
       triggerSources.value.forEach(({ source }, index) => {
         const path = triggerPaths.value[index] ?? "";
         const raw = values[index];
-        const threshold = Number(source.triggerLength ?? 0);
-        const text = raw === null || raw === undefined ? "" : String(raw);
-        const key = `${source.url}|${path}|${threshold}`;
-        if (text.length < threshold) {
-          // 低于阈值（如清空）：清掉判重记录，否则重新输入同一关键词会因判重而不请求
+        const key = `${source.id}|${source.url}|${path}`;
+        const decision = decideExternalTrigger(source, lastTriggered.get(key), raw);
+
+        if (decision.reason === "below-threshold") {
+          // 低于阈值（如清空）：清掉判重记录与在途防抖，保证重新输入同一关键词能再次请求
           lastTriggered.delete(key);
+          clearTriggerTimer(key);
           return;
         }
-        if (lastTriggered.get(key) === text) return;
-        lastTriggered.set(key, text);
-        void loadExternalSource(source, scope, {
-          signal: controller?.signal,
-          ownerPath: path,
-          onError: (message) => {
-            if (message) dataError.value = message;
-          },
-        });
+        if (!decision.shouldFetch) return;
+
+        // 防抖：逐字输入时只保留末次调度；延时到达才真正发请求并记下「已触发值」。
+        clearTriggerTimer(key);
+        const timer = setTimeout(() => {
+          debounceTimers.delete(key);
+          lastTriggered.set(key, decision.text);
+          void loadExternalSource(source, scope, {
+            signal: controller?.signal,
+            ownerPath: path,
+            onError: (message) => {
+              if (message) dataError.value = message;
+            },
+          });
+        }, externalDebounceMs(source));
+        debounceTimers.set(key, timer);
       });
     },
     { deep: true },
@@ -169,6 +189,8 @@ export function usePageScope(
   watch(
     () => page.value.id,
     () => {
+      debounceTimers.forEach((timer) => clearTimeout(timer));
+      debounceTimers.clear();
       lastTriggered.clear();
       resetScope();
     },
@@ -180,7 +202,11 @@ export function usePageScope(
     () => resetScope(),
   );
 
-  onBeforeUnmount(() => controller?.abort());
+  onBeforeUnmount(() => {
+    debounceTimers.forEach((timer) => clearTimeout(timer));
+    debounceTimers.clear();
+    controller?.abort();
+  });
 
   return { scope, loading, dataError, resetScope, reload: loadData };
 }
