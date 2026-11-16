@@ -3,7 +3,10 @@ import {
   applyExternalFill,
   collectExternalSources,
   createRequest,
+  decideExternalTrigger,
   defaultScopePath,
+  EXTERNAL_TRIGGER_DEBOUNCE_MS,
+  externalDebounceMs,
   isOnceOnly,
   loadExternalSource,
   loadExternalSources,
@@ -299,6 +302,44 @@ describe("触发长度", () => {
 
   it("未设阈值表示加载即取，不靠输入触发", () => {
     expect(reachesTriggerLength(source(), "anything")).toBe(false);
+  });
+});
+
+describe("decideExternalTrigger：两端共用的触发判定", () => {
+  it("未达阈值 → below-threshold，清掉上次值以便重输同值能再触发", () => {
+    const src = source({ triggerLength: 2 });
+    const d = decideExternalTrigger(src, "张", "张");
+    expect(d).toMatchObject({ shouldFetch: false, reason: "below-threshold", text: "张" });
+  });
+
+  it("达到阈值且与上次不同 → fetch", () => {
+    const src = source({ triggerLength: 1 });
+    expect(decideExternalTrigger(src, undefined, "张三")).toMatchObject({
+      shouldFetch: true,
+      reason: "fetch",
+      text: "张三",
+    });
+  });
+
+  it("与上次相同 → duplicate（防逐字 watch / React version 抖动导致请求风暴）", () => {
+    const src = source({ triggerLength: 1 });
+    expect(decideExternalTrigger(src, "张三", "张三").reason).toBe("duplicate");
+  });
+
+  it("once=false 时判定口径一致：每次不同的有效值仍触发（真请求由 ttl:0 保证）", () => {
+    const src = source({ triggerLength: 1, once: false });
+    expect(decideExternalTrigger(src, "张", "张三").shouldFetch).toBe(true);
+    expect(decideExternalTrigger(src, "张三", "张三").shouldFetch).toBe(false);
+  });
+
+  it("暴露共用防抖延时常量（正数）", () => {
+    expect(EXTERNAL_TRIGGER_DEBOUNCE_MS).toBeGreaterThan(0);
+  });
+
+  it("防抖延时：未配置取默认，显式值（含 0）保留", () => {
+    expect(externalDebounceMs(source())).toBe(EXTERNAL_TRIGGER_DEBOUNCE_MS);
+    expect(externalDebounceMs(source({ debounceMs: 0 }))).toBe(0);
+    expect(externalDebounceMs(source({ debounceMs: 50 }))).toBe(50);
   });
 });
 

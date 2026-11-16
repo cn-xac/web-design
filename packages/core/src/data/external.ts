@@ -131,6 +131,11 @@ export interface ExternalDataSource {
   /** 触发长度：输入达到该长度才发请求；0 / 缺省 = 页面加载即取 */
   triggerLength?: number;
   /**
+   * 触发型数据源的防抖延时（毫秒）：输入停止该时长后才真正请求，避免逐字打接口。
+   * 缺省取 EXTERNAL_TRIGGER_DEBOUNCE_MS；设 0 表示不防抖（每次变化立即请求）。
+   */
+  debounceMs?: number;
+  /**
    * @deprecated 触发元素固定为「绑定该源的节点」，运行时按该节点自身的绑定路径取触发值；
    * 此字段仅保留兼容旧 Schema，新配置不再写入。
    */
@@ -173,6 +178,53 @@ export function reachesTriggerLength(source: ExternalDataSource, value: unknown)
   if (!Number.isFinite(threshold) || threshold <= 0) return false;
   const text = value === null || value === undefined ? "" : String(value);
   return text.length >= threshold;
+}
+
+/**
+ * 渲染层触发型外部数据源的默认防抖延时（毫秒）。
+ * 用户逐字输入时合并为末次请求，避免「输入就打接口」；两端共用同一默认，体验一致。
+ */
+export const EXTERNAL_TRIGGER_DEBOUNCE_MS = 300;
+
+/** 读取触发型数据源的防抖延时：未配置取默认，显式 0 保留 */
+export function externalDebounceMs(source: ExternalDataSource): number {
+  return typeof source.debounceMs === "number" && Number.isFinite(source.debounceMs) && source.debounceMs >= 0
+    ? source.debounceMs
+    : EXTERNAL_TRIGGER_DEBOUNCE_MS;
+}
+
+export type ExternalTriggerReason = "below-threshold" | "duplicate" | "fetch";
+export interface ExternalTriggerDecision {
+  shouldFetch: boolean;
+  reason: ExternalTriggerReason;
+  /** 当前值转成用于判重的文本；调用方据此更新「上次值」 */
+  text: string;
+}
+
+/**
+ * 触发型外部数据源的调度判定（Vue / React 两端共用的唯一口径）。
+ *
+ * 渲染层不直接读 `once` / `triggerLength`，统一调用本函数，避免两端语义漂移：
+ * - 未达触发长度 → 不取数（并清掉「上次值」记录，保证清空后重输同值能再次触发）；
+ * - 值与上次相同 → 不取数（防请求风暴：输入逐字 watch / React version 抖动都会重复进入）；
+ * - 其余 → 取数。
+ *
+ * 「只请求一次」(once=true) 的额外保证在 provider 缓存层（TTL 不过期）；
+ * once=false 时 binding.cache 为 ttl:0，每次真取。防抖延时由渲染层按框架实现。
+ */
+export function decideExternalTrigger(
+  source: ExternalDataSource,
+  lastText: string | undefined,
+  value: unknown,
+): ExternalTriggerDecision {
+  const text = value === null || value === undefined ? "" : String(value);
+  if (!reachesTriggerLength(source, value)) {
+    return { shouldFetch: false, reason: "below-threshold", text };
+  }
+  if (lastText === text) {
+    return { shouldFetch: false, reason: "duplicate", text };
+  }
+  return { shouldFetch: true, reason: "fetch", text };
 }
 
 /**
