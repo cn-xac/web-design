@@ -53,7 +53,7 @@ export interface NodeSchema {
   visibility?: VisibilityConfig;
   /**
    * 数据计算配置（rtHicl）：按参与元素 + 算式自动求值并回填当前元素。
-   * 参与条件复用 ConditionGroup，子表单明细字段支持 sum / avg / min / max 聚合。
+   * 参与条件复用 ConditionGroup，子表单明细字段支持 sum / avg / min / max / text 聚合。
    */
   calculation?: CalculationConfig;
   children?: NodeSchema[];

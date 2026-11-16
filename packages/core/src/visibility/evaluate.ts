@@ -91,6 +91,15 @@ export function collectSeries(scope: Scope, path: string): unknown[] | null {
 /** 缺省聚合口径为求和，与 rtHicl「数据计算功能」保持一致 */
 export function aggregateSeries(values: unknown[], aggregate: ConditionAggregate = "sum"): unknown {
   if (values.length === 0) return undefined;
+
+  // 文本口径：按行顺序拼接非空值，默认换行分隔；不参与数值转换。
+  if (aggregate === "text") {
+    return values
+      .filter((value) => value !== null && value !== undefined && value !== "")
+      .map((value) => String(value))
+      .join("\n");
+  }
+
   if (values.length === 1) return values[0];
 
   const numbers = values.map(toNumber).filter((n): n is number => n !== null);

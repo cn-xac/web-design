@@ -191,7 +191,7 @@ export function validatePage(input: unknown, knownComponents?: Set<string>): Val
                 error(`${rowPath}.operator`, `不支持的条件关系 ${String(rawRow.operator)}`);
               }
               if (rawRow.aggregate !== undefined && !CONDITION_AGGS.has(String(rawRow.aggregate))) {
-                error(`${rowPath}.aggregate`, "不支持的聚合口径，仅支持 sum / avg / min / max");
+                error(`${rowPath}.aggregate`, "不支持的聚合口径，仅支持 sum / avg / min / max / text");
               }
               // 要么「左元素 + 关系 + 右值」，要么「仅值」，不允许半成品
               if (hasLeft !== hasOperator) {

@@ -25,7 +25,7 @@ import { collectCalculationTargets } from "./sources";
 import type { CalculationConfig, CalculationOperand, CalculationResult } from "./types";
 
 const ROW_PLACEHOLDER = /\[0\]/g;
-const AGGREGATES = new Set(["sum", "avg", "min", "max"]);
+const AGGREGATES = new Set(["sum", "avg", "min", "max", "text"]);
 const CONDITION_MODES = new Set(["and", "or", "advanced"]);
 
 /** 别名不能占用作用域根变量、字面量与函数名，否则会悄悄覆盖 scope */
@@ -234,7 +234,7 @@ export function validateCalculationConfig(config: unknown, targetPath?: string):
         errors.push(`${prefix} 不能引用当前元素自身`);
       }
       if (raw.aggregate !== undefined && !AGGREGATES.has(String(raw.aggregate))) {
-        errors.push(`${prefix} 的聚合口径只支持 sum / avg / min / max`);
+        errors.push(`${prefix} 的聚合口径只支持 sum / avg / min / max / text`);
       }
     });
   }

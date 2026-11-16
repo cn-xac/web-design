@@ -367,7 +367,43 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export function evaluateAst(ast: Ast, scope: Scope, functions?: ExpressionFunctionMap): unknown {
+/**
+ * 数值优先转换：能把值当成一个有限数就转成 number，否则返回 null。
+ * 用于数据计算的混编运算（输入框返回的 "12" 应能直接参与算术）。
+ * 空串与 null / undefined 不转——空值口径由 calculation 的 emptyAsZero 统一管；
+ * 多元素数组也不隐式转成 "1,2"，避免把拼接结果当数字。
+ */
+function toCalcNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const num = Number(trimmed);
+    return Number.isFinite(num) ? num : null;
+  }
+  if (Array.isArray(value) && value.length === 1) return toCalcNumber(value[0]);
+  return null;
+}
+
+export interface EvaluateAstOptions {
+  /**
+   * 数值优先的混编运算（仅数据计算通道开启）：
+   * 参与运算的值先尝试转成有限数值，"12" + 3 → 15、"12" * 3 → 36；
+   * 转不成数值时 `+` 回落到字符串拼接，其余运算符返回 undefined。
+   * 缺省 false，保证通用 {{}} 绑定 / 显隐 / 校验的严格语义不变。
+   */
+  numericCoercion?: boolean;
+}
+
+export function evaluateAst(
+  ast: Ast,
+  scope: Scope,
+  functions?: ExpressionFunctionMap,
+  options: EvaluateAstOptions = {},
+): unknown {
+  const coerce = options.numericCoercion === true;
+  const child = (node: Ast): unknown => evaluateAst(node, scope, functions, options);
   switch (ast.t) {
     case "lit":
       return ast.v;
@@ -378,7 +414,7 @@ export function evaluateAst(ast: Ast, scope: Scope, functions?: ExpressionFuncti
     case "call": {
       const fn = functions?.[ast.name];
       if (!fn) return undefined;
-      const args = ast.args.map((arg) => evaluateAst(arg, scope, functions));
+      const args = ast.args.map(child);
       try {
         return fn(args);
       } catch (error) {
@@ -388,9 +424,9 @@ export function evaluateAst(ast: Ast, scope: Scope, functions?: ExpressionFuncti
     }
 
     case "member": {
-      const obj = evaluateAst(ast.obj, scope, functions);
+      const obj = child(ast.obj);
       if (obj === null || obj === undefined) return undefined;
-      const key = evaluateAst(ast.key, scope, functions);
+      const key = child(ast.key);
       const keyStr = String(key);
       if (FORBIDDEN_KEYS.has(keyStr)) return undefined;
       if (typeof obj === "string") {
@@ -409,25 +445,68 @@ export function evaluateAst(ast: Ast, scope: Scope, functions?: ExpressionFuncti
     }
 
     case "unary": {
-      const arg = evaluateAst(ast.arg, scope, functions);
+      const arg = child(ast.arg);
       if (ast.op === "!") return !arg;
-      if (ast.op === "-") return typeof arg === "number" ? -arg : undefined;
-      if (ast.op === "+") return typeof arg === "number" ? arg : undefined;
+      if (ast.op === "-") {
+        if (coerce) {
+          const num = toCalcNumber(arg);
+          return num === null ? undefined : -num;
+        }
+        return typeof arg === "number" ? -arg : undefined;
+      }
+      if (ast.op === "+") {
+        if (coerce) {
+          const num = toCalcNumber(arg);
+          return num === null ? undefined : num;
+        }
+        return typeof arg === "number" ? arg : undefined;
+      }
       return undefined;
     }
 
     case "binary": {
       // 短路运算先求左值
       if (ast.op === "&&") {
-        const left = evaluateAst(ast.l, scope, functions);
-        return left ? evaluateAst(ast.r, scope, functions) : left;
+        const left = child(ast.l);
+        return left ? child(ast.r) : left;
       }
       if (ast.op === "||") {
-        const left = evaluateAst(ast.l, scope, functions);
-        return left ? left : evaluateAst(ast.r, scope, functions);
+        const left = child(ast.l);
+        return left ? left : child(ast.r);
       }
-      const l = evaluateAst(ast.l, scope, functions);
-      const r = evaluateAst(ast.r, scope, functions);
+      const l = child(ast.l);
+      const r = child(ast.r);
+
+      // 数值优先（仅计算通道）：两边都能转成有限数就按数值运算；
+      // 转不成时 `+` 保留原来的字符串拼接兜底，其它算术符返回 undefined。
+      if (coerce) {
+        const ln = toCalcNumber(l);
+        const rn = toCalcNumber(r);
+        const both = ln !== null && rn !== null;
+        switch (ast.op) {
+          case ">":
+            return both ? (ln as number) > (rn as number) : (l as number) > (r as number);
+          case ">=":
+            return both ? (ln as number) >= (rn as number) : (l as number) >= (r as number);
+          case "<":
+            return both ? (ln as number) < (rn as number) : (l as number) < (r as number);
+          case "<=":
+            return both ? (ln as number) <= (rn as number) : (l as number) <= (r as number);
+          case "+":
+            if (both) return (ln as number) + (rn as number);
+            if (typeof l === "string" || typeof r === "string") return `${l ?? ""}${r ?? ""}`;
+            return undefined;
+          case "-":
+            return both ? (ln as number) - (rn as number) : undefined;
+          case "*":
+            return both ? (ln as number) * (rn as number) : undefined;
+          case "/":
+            return both ? (ln as number) / (rn as number) : undefined;
+          case "%":
+            return both ? (ln as number) % (rn as number) : undefined;
+        }
+      }
+
       switch (ast.op) {
         case "===":
           return l === r;
@@ -465,9 +544,7 @@ export function evaluateAst(ast: Ast, scope: Scope, functions?: ExpressionFuncti
     }
 
     case "cond":
-      return evaluateAst(ast.test, scope, functions)
-        ? evaluateAst(ast.cons, scope, functions)
-        : evaluateAst(ast.alt, scope, functions);
+      return child(ast.test) ? child(ast.cons) : child(ast.alt);
 
     default:
       return undefined;
@@ -516,7 +593,8 @@ export function resolveValue(value: unknown, scope: Scope): unknown {
 
 /**
  * 计算模块专用：在显式白名单函数表下求值算式。
- * 与 `evaluate()` 的区别只在「允许调用白名单函数」，其余语法、路径、安全限制完全一致。
+ * 与 `evaluate()` 的区别：① 允许调用白名单函数；② 开启数值优先的混编运算。
+ * 语法、路径、安全限制与 `evaluate()` 完全一致。
  */
 export function evaluateWithFunctions(
   expression: string,
@@ -528,7 +606,7 @@ export function evaluateWithFunctions(
   const ast = parseCached(source, functions);
   if (!ast) return undefined;
   try {
-    return evaluateAst(ast, scope, functions);
+    return evaluateAst(ast, scope, functions, { numericCoercion: true });
   } catch (error) {
     warnOnce(`算式求值失败: ${source} -> ${(error as Error).message}`);
     return undefined;

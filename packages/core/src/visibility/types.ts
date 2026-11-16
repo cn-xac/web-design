@@ -14,7 +14,7 @@
  */
 
 /** 引用子表单明细字段时的聚合口径；缺省为求和 */
-export type ConditionAggregate = "sum" | "avg" | "min" | "max";
+export type ConditionAggregate = "sum" | "avg" | "min" | "max" | "text";
 
 /** 条件行关系运算符 */
 export type ConditionOperator =
@@ -123,6 +123,7 @@ export const CONDITION_AGGREGATES: ReadonlyArray<{ value: ConditionAggregate; la
   { value: "avg", label: "平均值" },
   { value: "min", label: "最小值" },
   { value: "max", label: "最大值" },
+  { value: "text", label: "文本" },
 ];
 
 export const CONDITION_OPERATOR_OPTIONS: ReadonlyArray<{
