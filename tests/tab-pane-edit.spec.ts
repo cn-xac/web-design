@@ -12,8 +12,7 @@ import { mount } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import type { Component } from "vue";
 import { SchemaRenderer } from "@x-ac/web-design-vue";
-import { createRegistry, DesignerStore, MATERIALS, type Material, type PageSchema, type UiAdapter } from "@x-ac/web-design-core";
-
+import { compactPage, createRegistry, DesignerStore, MATERIALS, type Material, type PageSchema, type UiAdapter } from "@x-ac/web-design-core";
 const tabsMaterial: Material = {
   component: "ec-tabs",
   title: "标签页",
@@ -80,6 +79,16 @@ describe("渲染器：paneSlotKey 物料的 children 必须渲染", () => {
 
   it("page 容器里的设计节点出现在 DOM（不再是空页签）", () => {
     const wrapper = mount(SchemaRenderer, { props: { page, adapter } });
+    expect(wrapper.html()).toContain("页签里的内容");
+  });
+
+  it("压缩（预览/保存）后仍渲染页签内容", () => {
+    const compact = compactPage(page);
+    // 压缩会删掉与默认值相同的 props；paneId 与 children 必须留存
+    const compactTabs = compact.children[0];
+    expect((compactTabs.children ?? []).some((c) => c.props?.paneId === "tab_a")).toBe(true);
+
+    const wrapper = mount(SchemaRenderer, { props: { page: compact, adapter } });
     expect(wrapper.html()).toContain("页签里的内容");
   });
 });
