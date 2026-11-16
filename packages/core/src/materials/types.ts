@@ -21,7 +21,12 @@ export type PropFieldType =
    * 「标签项维护」弹窗（增删改 + 拖拽排序）。具体弹窗由适配包的 editors 提供，
    * 引擎只认这个槽位名，不绑定任何 UI 库或具体物料。
    */
-  | "tabItems";
+  | "tabItems"
+  /**
+   * 容器数据驱动编辑器：配置 contentPath / contentMode / fieldMap，
+   * 运行时把 scope 里的业务 JSON 推导成页面。同样由适配包 editors 提供弹窗。
+   */
+  | "jsonPage";
 
 /**
  * 属性分组。属性面板按组折叠：UI 库组件的属性动辄二十几个，
@@ -94,6 +99,12 @@ export interface Material {
   events?: MaterialEvent[];
   /** 能否接收子节点 */
   acceptsChildren?: boolean;
+  /**
+   * 命名槽分发键：容器 children 按 `child.props[paneSlotKey]` 分发到不同命名槽，
+   * 用于标签页这类「一个父节点、多个并列内容槽」的物料（如 tabs 的 paneId）。
+   * 未配置时 children 走默认 slot，行为不变。
+   */
+  paneSlotKey?: string;
   /**
    * 设计态是否穿透包裹层（display: contents）。
    * 用于「栅格列」这类必须成为父级 flex/grid 直系子项的节点：

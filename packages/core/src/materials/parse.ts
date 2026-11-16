@@ -53,12 +53,20 @@ export function parsePairs(raw: unknown): PairItem[] {
  * 直接改协议会让旧页面渲染不出来。parseTabItems 负责把两种形态归一，
  * 运行时与设计器只认 TabItem[]，不再各自判空。
  */
+export type TabContentKind = "design" | "text" | "dataPath" | "url";
+
 export interface TabItem {
   /** 稳定标识：拖拽排序 / 增删改都以它为准，不能随下标漂移 */
   id: string;
   label: string;
   /** 自定义标记：用于「按数据控制默认激活哪个页签」 */
   mark?: string;
+  /**
+   * 内容来源。缺省按 dataPath → url → text 推断；旧结构没有此字段。
+   * - design：由 pane 容器里的设计节点承载（可拖拽编辑 / 数据驱动）；
+   * - text：纯文本，只兼容读取旧 Schema，设计器不再提供新建入口（要用文本请用文本标签节点）。
+   */
+  content?: TabContentKind;
   /** 纯文本内容（旧字符串的 value 落到这里） */
   text?: string;
   /** 绑定数据里的 schema 路径，运行时按 schema 协议解析为页面 */
@@ -96,7 +104,13 @@ export function parseTabItems(raw: unknown): TabItem[] {
         const mark = record.mark ?? record.tag;
         if (mark !== undefined && mark !== null && String(mark) !== "") item.mark = String(mark);
 
-        const text = record.text ?? record.value ?? record.content;
+        // 注意：record.content 在旧结构里可能是纯文本字符串。新结构 content 是来源枚举，
+        // 只有取到合法枚举值才当成来源，否则一律当文本，避免把正文误读成来源类型。
+        const validKinds: TabContentKind[] = ["design", "text", "dataPath", "url"];
+        if (typeof record.content === "string" && validKinds.includes(record.content as TabContentKind)) {
+          item.content = record.content as TabContentKind;
+        }
+        const text = record.text ?? record.value ?? (typeof record.content === "string" && !item.content ? record.content : undefined);
         if (text !== undefined && text !== null) item.text = String(text);
 
         if (record.dataPath) item.dataPath = String(record.dataPath);

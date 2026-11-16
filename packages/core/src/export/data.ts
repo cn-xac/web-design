@@ -26,6 +26,8 @@ export interface DataExportOptions {
   validate?: boolean;
   /** 渲染层持有的物料目录；不传则用全局 registry */
   materials?: MaterialRegistry;
+  /** 显式注入的字段（数据驱动容器的推导字段）；不传则从 page.children 收集 */
+  fields?: FormField[];
 }
 
 export interface ExportedField {
@@ -60,7 +62,9 @@ export function exportData(
   now: Date = new Date(),
 ): DataExportResult {
   const { includeEmpty = false, validate = true } = options;
-  const fields: FormField[] = collectFields(page, scope, options.materials);
+  // 推导字段（数据驱动容器里的表单控件）不在 page.children 里，由渲染层显式注入，
+  // 否则用推导表单填的值无法从 getData() 导出。
+  const fields: FormField[] = options.fields ?? collectFields(page, scope, options.materials);
 
   const data: Record<string, unknown> = {};
   const flat: Record<string, unknown> = {};

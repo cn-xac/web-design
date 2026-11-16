@@ -728,7 +728,47 @@ const FIELD_GROUP_OVERRIDES: Record<string, Record<string, PropFieldGroup>> = {
  * 并把每个字段的 portability 固化成显式值。
  * 历史 Schema 里的裸名（`input`）仍可解析 —— 归一化在 registry 查询时完成。
  */
-export const MATERIALS: Material[] = MATERIALS_RAW.map((raw) => {
+/* -------- 容器数据驱动字段（所有 acceptsChildren 物料统一注入） -------- */
+
+/**
+ * 容器「数据驱动页面」字段：contentPath 指向 scope 里的业务 JSON，
+ * 运行时由 core 的 derivePageFromJson 推导成节点树渲染。
+ * 用 jsonPage 类型让属性面板走适配包的结构化编辑器。
+ */
+export const DATA_DRIVEN_FIELDS: PropField[] = [
+  {
+    key: "contentPath",
+    label: "内容数据路径",
+    type: "jsonPage",
+    group: "data",
+    portability: "behavior",
+    tip: "留空则用拖入的静态节点；填 scope 路径（如 form.detail），运行时把该处 JSON 推导成页面",
+  },
+  {
+    key: "contentMode",
+    label: "推导控件",
+    type: "select",
+    options: [
+      { label: "可编辑表单", value: "form" },
+      { label: "只读展示", value: "view" },
+    ],
+    group: "data",
+    portability: "behavior",
+    tip: "业务 JSON 推导成页面时，字段用表单控件还是纯展示",
+  },
+];
+
+/** 给一批物料注入数据驱动字段；供适配包在归一化时调用，保证两端容器能力一致 */
+export function withDataDrivenFields<T extends Material>(materials: T[]): T[] {
+  return materials.map((material) => {
+    if (!material.acceptsChildren) return material;
+    const fields = mergeFields(material.fields, DATA_DRIVEN_FIELDS);
+    return { ...material, fields } as T;
+  });
+}
+
+/** 原始清单归一化（未注入数据驱动字段，供 withDataDrivenFields 复用） */
+const NORMALIZED_RAW: Material[] = MATERIALS_RAW.map((raw) => {
   const overrides = PORTABILITY_OVERRIDES[raw.component] ?? {};
   const groups = FIELD_GROUP_OVERRIDES[raw.component] ?? {};
   // 通用字段用 mergeFields 合并：同名键就地覆盖，不产生两个写同一 prop 的输入框
@@ -747,6 +787,8 @@ export const MATERIALS: Material[] = MATERIALS_RAW.map((raw) => {
     portable: raw.portable ?? true,
   });
 });
+
+export const MATERIALS: Material[] = withDataDrivenFields(NORMALIZED_RAW);
 
 export const registry: MaterialRegistry = createRegistry(MATERIALS);
 

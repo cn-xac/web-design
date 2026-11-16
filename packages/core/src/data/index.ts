@@ -15,3 +15,4 @@ export * from "./resolve";
 export * from "./registry";
 export * from "./external";
 export * from "./bindable";
+export * from "./json-page";

@@ -11,6 +11,8 @@
 
 import type { ActionSchema, DeviceType, NodeSchema, PageSchema } from "../schema/types";
 import { createEmptyPage } from "../schema/types";
+import type { TabItem } from "../materials/parse";
+import { migrateTextPanes, syncTabPanes } from "../schema/tabs";
 import type { ExternalDataSource } from "../data/external";
 import type { VisibilityConfig } from "../visibility/types";
 import type { CalculationConfig } from "../calculation/types";
@@ -411,6 +413,29 @@ export class DesignerStore {
       if (shouldDrop) delete node.props[key];
       else node.props[key] = value;
     }, `prop:${nodeId}:${key}`);
+    this.emit();
+  }
+
+  /**
+   * 写入标签项并同步 pane 容器（rGjzDs）。
+   * 一次 mutatePage 完成「props.items 写入 + 容器增删排序 + 旧文本迁移」，
+   * 保证一次保存只产生一条撤销记录；删除页签时其容器子树一并移除。
+   */
+  setTabItems(nodeId: string, items: TabItem[]): void {
+    this.mutatePage((page) => {
+      const tabs = findLocation(page.children, nodeId)?.node;
+      if (!tabs) return false;
+      // 旧 text 页签正文迁成 ec-text 节点后升级为 design，
+      // 这样容器不会被 syncTabPanes 当非 design 清掉，迁移内容才有落点。
+      const nextItems = (items.length ? items : []).map((entry) =>
+        entry.content === "text" && entry.text ? { ...entry, content: "design" as const } : entry,
+      );
+      tabs.props = tabs.props ?? {};
+      tabs.props.items = nextItems;
+      syncTabPanes(tabs, nextItems);
+      migrateTextPanes(tabs, nextItems);
+      return true;
+    }, `tabs:${nodeId}:items`);
     this.emit();
   }
 

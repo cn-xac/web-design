@@ -15,6 +15,7 @@ export * from "./schema/serialize";
 export * from "./schema/migrate";
 export * from "./schema/datasource";
 export * from "./schema/array";
+export * from "./schema/tabs";
 
 /** 元素显示 / 隐藏控制 + 通用多条件求值（r5u4Ul / rfD7Jv） */
 export * from "./visibility";
