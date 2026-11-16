@@ -25,14 +25,14 @@ export interface CalculationTroubleshooting {
 /** 与安全边界、别名、空值、参数有关的通用规则 */
 export const CALCULATION_USAGE_NOTES: readonly string[] = [
   "别名即变量：A / B / C… 来自参与元素，也可用 price 这类自定义名；必须字母开头、不可重复，不能占用 form / data / scope / 函数名等保留字。",
-  "数值转换：聚合与数学函数只认能转成有限数值的参数；null、undefined、空串、布尔值与非数值字符串会被忽略（不是按 0 计）。字符串 \"12\" 会转成 12。",
+  "数值转换（数值优先）：算式的 + - * / % 与比较运算先把两边尝试转成有限数值，\"12\" + 3 = 15、\"12\" * 3 = 36；转不成数值时 + 回落到字符串拼接，其余算术符返回空值。聚合与数学函数只认有限数值参数，非数值会被忽略。通用 {{path}} 绑定仍是严格语义，不受影响。",
   "数组展开：参数若是从作用域取到的数组会按元素展开；Schema 里不写数组字面量（表达式层不支持 [1,2] 这种写法）。",
   "空值口径：任一参与元素为空且未勾选「空值按 0 参与」时，整个结果清空（不进入函数）；勾选后空值按 0 代入。",
   "参数个数：不足或超出时函数返回空值，最终显示为空字符串，不会抛错，也不会留下脏值。",
   "大小写：函数名大小写不敏感（sum 与 SUM 等价），但变量别名区分大小写。",
   "运算能力：函数可与 + - * / %、比较、&& || !、三元 ?:、括号、路径（如 form.taxRate）自由组合；IF 的三个参数都会先求值，但均无副作用。",
   "结果归一：precision 对最终数值再四舍五入（0~10 位）；output: text 把结果转字符串；非有限数值（除零等）转为空串。",
-  "安全边界：函数名必须命中 18 个白名单；通用 {{path}} 绑定表达式仍禁函数调用；Schema 里不出现函数实现，全程不用 eval / new Function。",
+  "安全边界：函数名必须命中 30 个白名单；通用 {{path}} 绑定表达式仍禁函数调用；Schema 里不出现函数实现，全程不用 eval / new Function。",
 ];
 
 export const CALCULATION_RECIPES: readonly CalculationRecipe[] = [
@@ -47,6 +47,10 @@ export const CALCULATION_RECIPES: readonly CalculationRecipe[] = [
     operands: "A=数量；output=text",
     formula: "CONCAT('共 ', COUNT(A), ' 项，合计 ', SUM(A), ' 元')",
   },
+  { scene: "输入框字符串数字相加", operands: "A=单价(文本)、B=数量(文本)", formula: "A + B（数值优先；拼接用 CONCAT）" },
+  { scene: "明细姓名逐行拼一段", operands: "C=姓名明细，aggregate=text", formula: "C（各非空行用换行拼接）" },
+  { scene: "金额格式化展示", operands: "A=金额；output=text", formula: "TEXT(A, '#,##0.00')" },
+  { scene: "除零兜底", operands: "A=金额、B=数量", formula: "IFERROR(A / B, 0)" },
   { scene: "空值兜底", operands: "A=可选值", formula: "COALESCE(A, 0)（或勾选「空值按 0 参与」）" },
   {
     scene: "仅在启用时计算",
@@ -59,7 +63,7 @@ export const CALCULATION_TROUBLESHOOTING: readonly CalculationTroubleshooting[] 
   {
     symptom: "保存时报「不支持函数调用 XXX」",
     cause: "函数名不在白名单，或把函数写进了 {{}} 绑定表达式",
-    fix: "改用 18 个白名单函数之一；检查是否误写进绑定",
+    fix: "改用 30 个白名单函数之一；检查是否误写进绑定",
   },
   {
     symptom: "结果一直为空",

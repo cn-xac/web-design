@@ -107,7 +107,7 @@ console.log(CALCULATION_FUNCTIONS.map((fn) => fn.name));
 ## 其他能力
 
 - `expression.ts`：自研 tokenizer + Pratt parser，禁用 `eval` 与原型链逃逸；默认禁函数调用，白名单函数仅经 `evaluateWithFunctions()` 注入
-- `calculation/`：数据计算契约、18 个高级函数白名单、求值与设计期目标清单
+- `calculation/`：数据计算契约、30 个高级函数白名单、数值优先混编求值、算式点击构建纯函数与设计期目标清单
 - `tree.ts`：节点增删改移、面包屑、按新 id 克隆
 - `style/`：通用 margin / padding（四边相等收敛成简写）+ 组件契约样式
 - `actions/`：8 个声明式动作，副作用通过 `ActionAdapter` 注入
