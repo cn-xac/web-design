@@ -1,10 +1,12 @@
-import { Fragment, createElement, useContext } from "react";
+import { Fragment, createElement, useContext, useEffect, useMemo } from "react";
 import type { DragEvent, FocusEvent, ReactNode } from "react";
-import type { DropPosition } from "@x-ac/web-design-core";
+import type { DropPosition, FormField } from "@x-ac/web-design-core";
 import {
   ACTION_REGISTRY,
   DEFAULT_BINDING,
   createEventPayload,
+  derivePageFromJson,
+  describeField,
   extractPath,
   getByPath,
   isBindable,
@@ -25,7 +27,7 @@ import { RenderContext, BINDING_BASE, useRenderContext } from "./context";
 import type { RenderContextValue } from "./context";
 import { SchemaSubForm } from "./SchemaSubForm";
 
-const SKIP_PROPS = new Set(["label", "required", "tip", "block", "radius", "modelValue"]);
+const SKIP_PROPS = new Set(["label", "required", "tip", "block", "radius", "modelValue", "contentPath", "contentMode", "fieldMap", "paneId"]);
 
 /** 与 Vue 的 positionFromEvent 同一套阈值：容器上下 1/4 为 before/after，中间 inside */
 function positionFromEvent(event: DragEvent<HTMLDivElement>, acceptsChildren: boolean): DropPosition {
@@ -164,6 +166,46 @@ function NodeBody({ node, decision }: { node: NodeSchema; decision: VisibilityDe
   const material = ctx.catalog.get(node.component);
   const effective = ctx.catalog.defaults(node.component, node.props);
 
+  /* 数据驱动容器（rGjzDs）：非设计态 + 有 contentPath 时把 scope 里的业务 JSON 推导成临时树 */
+  const derivedNodes = useMemo<NodeSchema[] | null>(() => {
+    if (ctx.design || !material?.acceptsChildren) return null;
+    const path = effective.contentPath;
+    if (typeof path !== "string" || !path.trim()) return null;
+    const data = getByPath(ctx.scope, path);
+    if (data === undefined || data === null) return null;
+    const mode = effective.contentMode === "view" ? "view" : "form";
+    const fieldMap = effective.fieldMap && typeof effective.fieldMap === "object"
+      ? effective.fieldMap as Record<string, import("@x-ac/web-design-core").JsonPageFieldRule>
+      : undefined;
+    const nodes = derivePageFromJson(data, { rootPath: path, mode, fieldMap });
+    return nodes.length ? nodes : null;
+  }, [ctx.design, ctx.scope, material?.acceptsChildren, effective.contentPath, effective.contentMode, effective.fieldMap]);
+
+  /** 推导字段注册进 context，供 validate() 一并校验 */
+  const derivedFields = useMemo<FormField[]>(() => {
+    if (!derivedNodes) return [];
+    const out: FormField[] = [];
+    const walk = (nodes: NodeSchema[]): void => {
+      for (const item of nodes) {
+        const field = describeField(item, ctx.scope, ctx.catalog, "form");
+        if (field) out.push(field);
+        if (item.children) walk(item.children);
+      }
+    };
+    walk(derivedNodes);
+    return out;
+  }, [derivedNodes, ctx.scope, ctx.catalog]);
+
+  useEffect(() => {
+    const registry = ctx.derivedFields;
+    if (!registry) return;
+    if (derivedFields.length) registry.set(node.id, derivedFields);
+    else registry.delete(node.id);
+    return () => {
+      registry.delete(node.id);
+    };
+  }, [ctx.derivedFields, derivedFields, node.id]);
+
   const style = resolveNodeStyle(
     node.component,
     effective,
@@ -272,12 +314,13 @@ function NodeBody({ node, decision }: { node: NodeSchema; decision: VisibilityDe
     // 不依赖各 UI 库是否转发 onBlur，组件自带的 events.blur 动作也照常派发。
   }
 
-  /* 正文：textProp 优先，其次是子节点 */
+  /* 正文：textProp 优先，其次是子节点（数据驱动时改用推导树） */
   const text = material.textProp ? resolveValue(effective[material.textProp], ctx.scope) : undefined;
+  const renderChildren = derivedNodes ?? node.children ?? [];
   const children: ReactNode =
     text !== undefined && text !== null
       ? String(text)
-      : (node.children ?? []).map((child) => <SchemaNode key={child.id} node={child} />);
+      : renderChildren.map((child) => <SchemaNode key={child.id} node={child} />);
 
   const control = Component ? (
     createElement(Component, { ...bound, ...handlers, key: node.id }, children)

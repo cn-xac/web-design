@@ -4,6 +4,7 @@ import type {
   ActionSchema,
   DropPosition,
   ExternalVisibility,
+  FormField,
   MaterialRegistry,
   NodeSchema,
   PageSchema,
@@ -62,6 +63,8 @@ export interface RenderContextValue {
   designer?: RendererDesignerScene;
   /** submitForm 动作成功时回调，供宿主发请求 */
   onFormSubmit?: (payload: Record<string, unknown>, action: ActionSchema) => void;
+  /** 数据驱动容器的推导字段注册表（rGjzDs），validate 时并入真实字段 */
+  derivedFields?: Map<string, FormField[]>;
 }
 
 export const RenderContext = createContext<RenderContextValue | null>(null);

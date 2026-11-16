@@ -18,6 +18,7 @@ import type {
   ExternalDataSource,
   PageSchema,
   PageRepository,
+  TabItem,
   ValidationRule,
   VisibilityConfig,
 } from "@x-ac/web-design-core";
@@ -82,6 +83,8 @@ export const useDesignerStore = defineStore("designer", () => {
   const copySelected = () => kernel.copySelected();
   const pasteNode = () => kernel.pasteNode();
   const updateProp = (key: string, value: unknown) => kernel.updateProp(key, value);
+  /** 标签项写入 + pane 容器同步（rGjzDs），一次撤销记录 */
+  const setTabItems = (nodeId: string, items: TabItem[]) => kernel.setTabItems(nodeId, items);
   const updateNodeProp = (nodeId: string, key: string, value: unknown) =>
     kernel.updateNodeProp(nodeId, key, value);
   const upsertExternalSource = (source: ExternalDataSource) => kernel.upsertExternalSource(source);
@@ -145,6 +148,7 @@ export const useDesignerStore = defineStore("designer", () => {
     copySelected,
     pasteNode,
     updateProp,
+    setTabItems,
     updateNodeProp,
     upsertExternalSource,
     removeExternalSource,

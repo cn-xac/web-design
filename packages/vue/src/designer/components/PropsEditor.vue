@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, type Component } from "vue";
-import type { PropField, PropFieldGroup } from "@x-ac/web-design-core";
+import type { PropField, PropFieldGroup, TabItem } from "@x-ac/web-design-core";
 import { FIELD_GROUP_LABELS, canOwnCalculation, canOwnExternalSource, fieldOptions, groupFields, parseOptions } from "@x-ac/web-design-core";
 import UiControl from "../ui/UiControl.vue";
 import { useMaterialCatalog } from "../../materials/catalog";
@@ -68,6 +68,12 @@ function isBound(input: unknown): boolean {
 }
 
 function set(key: string, next: unknown): void {
+  // 标签项写入要同步 pane 容器（增删页签连带子树），必须走专用入口
+  const field = material.value?.fields.find((item) => item.key === key);
+  if (field?.type === "tabItems" && node.value) {
+    store.setTabItems(node.value.id, next as TabItem[]);
+    return;
+  }
   store.updateProp(key, next);
 }
 

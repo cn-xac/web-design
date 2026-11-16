@@ -1,5 +1,5 @@
 import { inject, type InjectionKey } from "vue";
-import type { ExternalVisibility, NodeSchema, Material, PageSchema, UiAdapter, UiEventHook, UiEventPayload } from "@x-ac/web-design-core";
+import type { ExternalVisibility, FormField, NodeSchema, Material, PageSchema, UiAdapter, UiEventHook, UiEventPayload } from "@x-ac/web-design-core";
 
 /** 渲染上下文：动作执行、字段校验、跨页跳转都从这里拿 */
 export interface RenderContext {
@@ -18,6 +18,12 @@ export interface RenderContext {
   onEvent?: UiEventHook;
   /** 宿主按节点 id 传入的显隐控制（r5u4Ul），可标记 force */
   visibility?: ExternalVisibility;
+  /**
+   * 数据驱动容器的推导字段注册表（rGjzDs）：容器节点 id → 推导出的表单字段。
+   * validate() 会把这些字段与真实 schema 字段合并校验，
+   * 让「外部数据源 → 容器 → 页面」里的表单同样参与校验与错误显示。
+   */
+  derivedFields?: Map<string, FormField[]>;
 }
 
 export const RENDER_CONTEXT: InjectionKey<RenderContext> = Symbol("wb-render-context");

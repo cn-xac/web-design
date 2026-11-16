@@ -3,10 +3,10 @@
  * 递归渲染器。入参只有 PageSchema，不依赖设计器任何模块。
  * mode=view 挂事件、跑动作；mode=edit 只做视觉呈现，供设计器包裹交互。
  */
-import { computed, inject, provide } from "vue";
+import { computed, inject, provide, watch } from "vue";
 import type { CSSProperties, Component } from "vue";
-import type { NodeSchema } from "@x-ac/web-design-core";
-import { DEFAULT_BINDING, camelizeEventName, createEventPayload, materialKey, runEventHooks } from "@x-ac/web-design-core";
+import type { FormField, NodeSchema } from "@x-ac/web-design-core";
+import { DEFAULT_BINDING, camelizeEventName, createEventPayload, derivePageFromJson, describeField, materialKey, runEventHooks } from "@x-ac/web-design-core";
 import FieldShell from "./FieldShell.vue";
 import SchemaSubForm from "./SchemaSubForm.vue";
 import { extractPath, getByPath, isBindable, isRequired, resolveDirectiveVisibility, resolveLoopInstances, resolveNodeStyle, resolveValue, resolveVisibility, setByPath } from "@x-ac/web-design-core";
@@ -105,7 +105,8 @@ const bindProps = computed<Record<string, unknown>>(() => {
 
   for (const [key, value] of Object.entries(raw)) {
     // 面板/外壳专用字段，以及正文来自 textProp 的字段，都不透传给组件
-    if (["label", "required", "tip", "block", "radius", "modelValue"].includes(key)) continue;
+    // contentPath/contentMode/fieldMap/paneId 是引擎内部字段（数据驱动 / pane 分发），不进 DOM
+    if (["label", "required", "tip", "block", "radius", "modelValue", "contentPath", "contentMode", "fieldMap", "paneId"].includes(key)) continue;
     if (materialMeta?.textProp === key) continue;
     if (materialMeta?.internalProps?.includes(key)) continue;
     // 表达式能力按 Schema 里的通用名判断，映射只改最终传给组件的属性名
@@ -132,6 +133,58 @@ const bindProps = computed<Record<string, unknown>>(() => {
 
   return out;
 });
+
+/* ---------------- 数据驱动容器（rGjzDs） ---------------- */
+
+/**
+ * 容器配了 contentPath 且非设计态时，从 scope 取业务 JSON 推导成临时节点树。
+ * 推导节点不写回 node.children：不进大纲树、不进导出、不进撤销栈。
+ * 设计态始终渲染静态 children，保证可视化拖拽编辑不受影响。
+ */
+const derivedNodes = computed<NodeSchema[] | null>(() => {
+  if (props.design || !material.value?.acceptsChildren) return null;
+  const path = effective.value.contentPath;
+  if (typeof path !== "string" || !path.trim()) return null;
+  const data = getByPath(props.scope, path);
+  if (data === undefined || data === null) return null;
+  const mode = effective.value.contentMode === "view" ? "view" : "form";
+  const fieldMap = effective.value.fieldMap && typeof effective.value.fieldMap === "object"
+    ? effective.value.fieldMap as Record<string, import("@x-ac/web-design-core").JsonPageFieldRule>
+    : undefined;
+  const nodes = derivePageFromJson(data, { rootPath: path, mode, fieldMap });
+  return nodes.length ? nodes : null;
+});
+
+/** 实际渲染的 children：有推导树时用它，否则用静态 children */
+const renderChildren = computed<NodeSchema[]>(() => derivedNodes.value ?? props.node.children ?? []);
+
+/**
+ * 把推导树里的表单字段注册进 RENDER_CONTEXT，让 validate() 能一并校验。
+ * 只收集直属表单控件（含递归），键为宿主容器节点 id。
+ */
+const derivedFieldList = computed<FormField[]>(() => {
+  if (!derivedNodes.value || !renderCtx) return [];
+  const out: FormField[] = [];
+  const walk = (nodes: NodeSchema[]): void => {
+    for (const node of nodes) {
+      const field = describeField(node, props.scope, catalog, "form");
+      if (field) out.push(field);
+      if (node.children) walk(node.children);
+    }
+  };
+  walk(derivedNodes.value);
+  return out;
+});
+
+watch(
+  derivedFieldList,
+  (fields) => {
+    if (!renderCtx?.derivedFields) return;
+    if (fields.length) renderCtx.derivedFields.set(props.node.id, fields);
+    else renderCtx.derivedFields.delete(props.node.id);
+  },
+  { immediate: true, flush: "post" },
+);
 
 const slotText = computed<string | null>(() => {
   const key = material.value?.textProp;
@@ -260,7 +313,7 @@ const passthroughDraggable = computed(() => (isPassthrough.value ? "true" : unde
 
 /** 空容器在设计态给一块可点击的占位区，否则高度塌成 0 根本点不中 */
 const showEmptyHint = computed(
-  () => props.design && Boolean(material.value?.acceptsChildren) && !(props.node.children?.length),
+  () => props.design && Boolean(material.value?.acceptsChildren) && !(renderChildren.value.length),
 );
 
 const hint = computed(() => (props.design ? (scene?.hintFor(props.node.id) ?? null) : null));
@@ -396,9 +449,13 @@ function selectSelf(): void {
       :style="mergedStyle"
     >
       <template v-if="slotText !== null">{{ slotText }}</template>
+      <!-- 普通容器 / 数据驱动推导树。
+           pane 类物料（paneSlotKey）的 children 也走默认 slot：
+           物料组件自己按 child.props.node.props[paneSlotKey] 分组到各页签，
+           避免 v-for + 动态插槽名触发 Vue 3.5 编译器 bug。 -->
       <template v-if="material?.acceptsChildren">
         <SchemaNode
-          v-for="child in node.children ?? []"
+          v-for="child in renderChildren"
           :key="child.id"
           :node="child"
           :scope="scope"

@@ -5,6 +5,7 @@ import type {
   DataExportOptions,
   DataExportResult,
   ExternalVisibility,
+  FormField,
   Material,
   MaterialRegistry,
   NodeSchema,
@@ -14,6 +15,7 @@ import type {
   UiEventPayload,
 } from "@x-ac/web-design-core";
 import {
+  collectFields,
   createEmptyPage,
   createRegistry,
   deepClone,
@@ -182,6 +184,9 @@ export const SchemaRenderer = forwardRef<SchemaRendererHandle, SchemaRendererPro
     });
   }, [data]);
 
+  /** 数据驱动容器的推导字段注册表（rGjzDs），validate 时并入真实字段 */
+  const derivedFieldsRef = useRef<Map<string, FormField[]>>(new Map());
+
   /** 失焦校验：只算当前字段，改完立即消红 */
   const validateField = (node: NodeSchema): void => {
     const issue = validateNodeField(node, store.scope, undefined, catalog);
@@ -191,16 +196,29 @@ export const SchemaRenderer = forwardRef<SchemaRendererHandle, SchemaRendererPro
   useImperativeHandle(ref, () => ({
     validate() {
       const errors: Record<string, string> = { ...store.errors };
-      const result = validateData(schema, store.scope, { errors, materials: catalog });
+      const extra: FormField[] = [];
+      derivedFieldsRef.current.forEach((fields) => extra.push(...fields));
+      const result = validateData(schema, store.scope, {
+        errors,
+        materials: catalog,
+        fields: extra.length ? [...collectFields(schema, store.scope, catalog), ...extra] : undefined,
+      });
       store.setErrors(errors);
       return result.valid;
     },
     getData(options?: DataExportOptions) {
-      // 目录必须带上：否则业务物料（isFormControl）会被当成非表单组件，字段直接丢
-      return exportData(schema, store.scope, { ...options, materials: catalog });
+      // 目录必须带上：否则业务物料（isFormControl）会被当成非表单组件，字段直接丢。
+      // 推导字段（数据驱动容器）不在 schema 里，显式并入才能导出用户填写的值。
+      const extra: FormField[] = [];
+      derivedFieldsRef.current.forEach((fields) => extra.push(...fields));
+      const fields = extra.length ? [...collectFields(schema, store.scope, catalog), ...extra] : undefined;
+      return exportData(schema, store.scope, { ...options, materials: catalog, fields });
     },
     exportData(options?: DataExportOptions) {
-      return exportData(schema, store.scope, { ...options, materials: catalog });
+      const extra: FormField[] = [];
+      derivedFieldsRef.current.forEach((fields) => extra.push(...fields));
+      const fields = extra.length ? [...collectFields(schema, store.scope, catalog), ...extra] : undefined;
+      return exportData(schema, store.scope, { ...options, materials: catalog, fields });
     },
     getErrors() {
       return { ...store.errors };
@@ -239,6 +257,7 @@ export const SchemaRenderer = forwardRef<SchemaRendererHandle, SchemaRendererPro
     design,
     designer,
     onFormSubmit: onSubmit ? (payload) => onSubmit(payload) : undefined,
+    derivedFields: derivedFieldsRef.current,
   };
 
   const rootClass = className ? `ux-page ${className}` : "ux-page";

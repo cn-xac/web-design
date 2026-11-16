@@ -12,7 +12,7 @@ import {
   groupFields,
   parseOptions,
 } from "@x-ac/web-design-core";
-import type { PropField, PropFieldGroup } from "@x-ac/web-design-core";
+import type { PropField, PropFieldGroup, TabItem } from "@x-ac/web-design-core";
 import { useDesigner } from "../context";
 import { useDesignerDialogs } from "../dialogs";
 import { UiControl } from "../ui";
@@ -137,7 +137,15 @@ export function PropsEditor() {
   const value = (key: string): unknown => effective[key];
   const isCustom = (key: string): boolean => customKeys.has(key);
   const isBound = (input: unknown): boolean => typeof input === "string" && input.includes("{{");
-  const set = (key: string, next: unknown): void => store.updateProp(key, next);
+  const set = (key: string, next: unknown): void => {
+    // 标签项写入要同步 pane 容器（增删页签连带子树），必须走专用入口
+    const field = material?.fields.find((item) => item.key === key);
+    if (field?.type === "tabItems") {
+      store.setTabItems(nodeId, next as TabItem[]);
+      return;
+    }
+    store.updateProp(key, next);
+  };
 
   /** 适配包字段编辑器覆盖：columns 由引擎内置结构化编辑器接管，不走覆盖 */
   const editorFor = (field: PropField): ComponentType<any> | null => {

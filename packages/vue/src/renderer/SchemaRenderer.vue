@@ -20,13 +20,14 @@ import type {
   DataExportOptions,
   DataExportResult,
   ExternalVisibility,
+  FormField,
   NodeSchema,
   PageSchema,
   UiAdapter,
   UiEventHook,
   UiEventPayload,
 } from "@x-ac/web-design-core";
-import { exportData, createEmptyPage, MATERIALS, migratePage, validateData, validateNodeField } from "@x-ac/web-design-core";
+import { collectFields, exportData, createEmptyPage, MATERIALS, migratePage, validateData, validateNodeField } from "@x-ac/web-design-core";
 import SchemaNode from "./SchemaNode.vue";
 import { RENDER_CONTEXT, UI_ADAPTER } from "./context";
 import { usePageScope } from "./usePageScope";
@@ -185,9 +186,14 @@ const catalog = computed(() =>
   registryForMaterials(activeAdapter.value?.materials?.length ? activeAdapter.value.materials : MATERIALS),
 );
 
+/** 数据驱动容器的推导字段（rGjzDs）：容器挂载时注册，validate 时合并 */
+const derivedFields = new Map<string, FormField[]>();
+
 /** 校验整页数据，错误会直接显示到对应字段下方 */
 function validate(): boolean {
-  return validateData(pageRef.value, scope, { errors, materials: catalog.value }).valid;
+  // 推导字段来自临时节点树，不在 page.children 里，需显式并入。
+  // 用 getByPath 按 path 重取值（validateFieldValue 内部已做），避免快照旧值。
+  return validateData(pageRef.value, scope, { errors, materials: catalog.value, fields: allFields() }).valid;
 }
 
 /** 单字段校验：失焦时用，避免一次扫描整页 */
@@ -195,9 +201,17 @@ function validateField(node: NodeSchema): void {
   validateNodeField(node, scope, errors, catalog.value);
 }
 
+/** 合并真实字段与数据驱动容器的推导字段，供校验 / 导出共用 */
+function allFields(): FormField[] {
+  const base = collectFields(pageRef.value, scope, catalog.value);
+  const extra: FormField[] = [];
+  derivedFields.forEach((fields) => extra.push(...fields));
+  return extra.length ? [...base, ...extra] : base;
+}
+
 /** 收集表单数据（默认顺带校验） */
 function getData(options?: DataExportOptions): DataExportResult {
-  return exportData(pageRef.value, scope, { ...options, materials: catalog.value });
+  return exportData(pageRef.value, scope, { ...options, materials: catalog.value, fields: allFields() });
 }
 
 function getErrors(): Record<string, string> {
@@ -223,6 +237,7 @@ provide(RENDER_CONTEXT, {
   errors,
   resetScope,
   validateField,
+  derivedFields,
   navigate: (to: string) => {
     emit("navigate", to);
     if (props.navigate) props.navigate(to);
