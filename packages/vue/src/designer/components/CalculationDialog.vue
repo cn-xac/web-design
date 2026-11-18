@@ -43,6 +43,7 @@ import { useDesignerStore } from "../store";
 import { useCalculationDialog } from "../dialogs";
 import { useNotify } from "../ui/kit";
 import ModalShell from "../ui/ModalShell.vue";
+import UiControl from "../ui/UiControl.vue";
 import CalculationHelpDialog from "./CalculationHelpDialog.vue";
 
 interface DraftOperand {
@@ -61,7 +62,11 @@ interface DraftConditionRow {
 const store = useDesignerStore();
 const dialog = useCalculationDialog();
 const notify = useNotify();
-const formulaEl = ref<HTMLTextAreaElement | null>(null);
+/** 算式输入框走 UiControl（适配包控件），用包裹层查询真实 textarea 以定位光标 */
+const formulaHost = ref<HTMLElement | null>(null);
+function formulaInput(): HTMLTextAreaElement | HTMLInputElement | null {
+  return formulaHost.value?.querySelector("textarea, input") ?? null;
+}
 /** 当前查看说明的函数；悬停 / 聚焦时切换 */
 const activeFn = ref<CalculationFunction | null>(null);
 /** 正在做参数引导的函数（与悬停说明卡分开） */
@@ -108,6 +113,31 @@ function labelOf(path: string): string {
 function isUnary(operator: ConditionOperator): boolean {
   return CONDITION_OPERATOR_OPTIONS.find((option) => option.value === operator)?.unary ?? false;
 }
+
+/** UiControl 的 Select 统一用 { label, value } 候选 */
+const elementOptions = computed(() =>
+  elements.value.map((element) => ({
+    label: `${element.label}（${element.path}）`,
+    value: element.path,
+  })),
+);
+const aggregateOptions = computed(() =>
+  CALCULATION_AGGREGATES.map((option) => ({ label: option.label, value: option.value })),
+);
+const operatorOptions = CONDITION_OPERATOR_OPTIONS.map((option) => ({
+  label: option.label,
+  value: option.value,
+}));
+const outputOptions = [
+  { label: "数值", value: "number" },
+  { label: "文本", value: "text" },
+];
+const guideElementOptions = computed(() =>
+  draft.value.operands.map((operand) => ({
+    label: `${operand.alias} · ${labelOf(operand.path) || operand.path}`,
+    value: operand.path,
+  })),
+);
 
 function blankOperand(): DraftOperand {
   return { path: "", alias: CALCULATION_ALIASES[draft.value.operands.length] ?? `V${draft.value.operands.length + 1}`, aggregate: "sum" };
@@ -225,14 +255,14 @@ function removeConditionRow(index: number): void {
 
 /** 把 token 插到算式光标处；textarea 没有焦点时追加到末尾 */
 function insertToken(token: string): void {
-  const element = formulaEl.value;
+  const element = formulaInput();
   const text = draft.value.formula;
   const start = element?.selectionStart ?? text.length;
   const end = element?.selectionEnd ?? start;
   const result = insertFormulaToken(text, token, start, end);
   draft.value.formula = result.formula;
   void nextTick(() => {
-    const el = formulaEl.value;
+    const el = formulaInput();
     if (!el) return;
     el.focus();
     el.setSelectionRange(result.cursor, result.cursor);
@@ -267,9 +297,8 @@ function setSlotFromElement(index: number, path: string): void {
   else notify("请先在上方的参与元素中加入该元素", "error");
 }
 
-function onSlotElementChange(index: number, event: Event): void {
-  const target = event.target as HTMLSelectElement | null;
-  if (target?.value) setSlotFromElement(index, target.value);
+function onSlotElementChange(index: number, path: string): void {
+  if (path) setSlotFromElement(index, path);
 }
 
 /** 参数填完 → 拼成调用文本插进算式 */
@@ -326,101 +355,111 @@ function clear(): void {
     <div class="calc__rows wb-scroll">
       <div v-for="(operand, index) in draft.operands" :key="index" class="calc__row">
         <span class="calc__no">{{ index + 1 }}</span>
-        <select v-model="operand.path" class="calc__select calc__element" aria-label="参与元素">
-          <option value="">选择元素</option>
-          <option v-for="element in elements" :key="element.nodeId" :value="element.path">
-            {{ element.label }}（{{ element.path }}）
-          </option>
-        </select>
-        <select
+        <UiControl
+          as="Select"
+          v-model="operand.path"
+          :options="elementOptions"
+          placeholder="选择元素"
+          class="calc__select calc__element"
+          aria-label="参与元素"
+        />
+        <UiControl
           v-if="requiresAggregate(operand.path)"
+          as="Select"
           v-model="operand.aggregate"
+          :options="aggregateOptions"
           class="calc__select calc__aggregate"
           aria-label="聚合口径"
-        >
-          <option v-for="option in CALCULATION_AGGREGATES" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </option>
-        </select>
-        <input v-model="operand.alias" class="calc__alias" type="text" aria-label="算式变量名" placeholder="变量名 A" />
-        <button
+        />
+        <UiControl
+          as="Input"
+          v-model="operand.alias"
+          class="calc__alias"
+          type="text"
+          aria-label="算式变量名"
+          placeholder="变量名 A"
+        />
+        <UiControl
           v-if="operand.alias.trim()"
-          type="button"
+          as="Button"
           class="calc__insert"
           :title="`把 ${operand.alias} 插入算式`"
           @click="insertOperand(operand.alias)"
-        >插入</button>
-        <button type="button" class="calc__del" aria-label="删除参与元素" @click="removeOperand(index)">×</button>
+        >插入</UiControl>
+        <UiControl as="Button" class="calc__del" aria-label="删除参与元素" @click="removeOperand(index)">×</UiControl>
       </div>
       <div v-if="!draft.operands.length" class="calc__empty">还没有参与元素</div>
     </div>
-    <button type="button" class="calc__add" @click="addOperand">＋ 添加元素</button>
+    <UiControl as="Button" class="calc__add" @click="addOperand">＋ 添加元素</UiControl>
 
     <div class="calc__section">算式</div>
     <div class="calc__builder">
       <div class="calc__token-row">
         <span class="calc__builder-label">点选元素</span>
-        <button
+        <UiControl
           v-for="operand in draft.operands.filter((item) => item.alias.trim())"
           :key="operand.alias"
-          type="button"
+          as="Button"
           class="calc__chip"
           :title="`插入 ${operand.alias}：${labelOf(operand.path) || operand.path}`"
           @click="insertOperand(operand.alias)"
-        >{{ operand.alias }}</button>
+        >{{ operand.alias }}</UiControl>
         <span v-if="!draft.operands.some((item) => item.alias.trim())" class="calc__builder-empty">
           先在上方添加参与元素
         </span>
       </div>
       <div class="calc__token-row">
         <span class="calc__builder-label">运算符</span>
-        <button
+        <UiControl
           v-for="button in FORMULA_OPERATOR_BUTTONS"
           :key="button.value"
-          type="button"
+          as="Button"
           class="calc__token"
           @click="insertToken(button.value)"
-        >{{ button.label }}</button>
+        >{{ button.label }}</UiControl>
       </div>
       <div class="calc__token-row">
         <span class="calc__builder-label">数字</span>
-        <button
+        <UiControl
           v-for="number in FORMULA_NUMBER_BUTTONS"
           :key="number"
-          type="button"
+          as="Button"
           class="calc__token"
           @click="insertToken(number)"
-        >{{ number }}</button>
+        >{{ number }}</UiControl>
       </div>
     </div>
-    <textarea
-      ref="formulaEl"
-      v-model="draft.formula"
-      class="calc__formula wb-mono"
-      rows="3"
-      spellcheck="false"
-      placeholder="例如：A * B，或 ROUND(SUM(A, B), 2)"
-    />
+    <div ref="formulaHost">
+      <UiControl
+        as="Input"
+        v-model="draft.formula"
+        class="calc__formula wb-mono"
+        type="textarea"
+        :rows="3"
+        spellcheck="false"
+        placeholder="例如：A * B，或 ROUND(SUM(A, B), 2)"
+      />
+    </div>
     <div class="calc__tip" :class="{ 'is-error': formulaError }">
       {{ formulaError || "用变量名引用参与元素；支持 + - * / %、比较、三元与括号。" }}
     </div>
 
     <div class="calc__fn-title">
       <span class="calc__fn-label">高级函数（点函数名 → 填参数 → 插入算式）</span>
-      <button
-        type="button"
+      <UiControl
+        as="Button"
         class="calc__help-btn"
         title="查看完整使用说明（通用规则 / 30 个函数 / 业务配方 / 排错）"
         aria-label="查看完整使用说明"
         @click="helpVisible = true"
-      >?</button>
+      >?</UiControl>
     </div>
     <div v-for="group in functionGroups" :key="group.group" class="calc__fn-group">
       <span class="calc__fn-group-name">{{ group.group }}</span>
-      <button
+      <UiControl
         v-for="fn in group.items"
         :key="fn.name"
-        type="button"
+        as="Button"
         class="calc__fn"
         :title="`${fn.signature} — ${fn.description}`"
         @mouseenter="activeFn = fn"
@@ -428,27 +467,30 @@ function clear(): void {
         @click="beginFunctionGuide(fn)"
       >
         {{ fn.name }}
-      </button>
+      </UiControl>
     </div>
     <div v-if="guideFn" class="calc__guide">
       <div class="calc__guide-head">
         <b>{{ guideFn.name }}</b>
         <span>逐项填入，或点选参与元素的别名</span>
-        <button type="button" class="calc__guide-close" aria-label="取消参数引导" @click="closeFunctionGuide">×</button>
+        <UiControl as="Button" class="calc__guide-close" aria-label="取消参数引导" @click="closeFunctionGuide">×</UiControl>
       </div>
       <div v-for="(slot, index) in argSlots" :key="index" class="calc__guide-row">
         <span class="calc__guide-label">{{ slot.label }}</span>
-        <input v-model="slot.value" class="calc__guide-input" type="text" :placeholder="slot.label" />
-        <select class="calc__guide-select" aria-label="从参与元素填入" @change="onSlotElementChange(index, $event)">
-          <option value="">从元素选…</option>
-          <option v-for="operand in draft.operands" :key="operand.path" :value="operand.path">
-            {{ operand.alias }} · {{ labelOf(operand.path) || operand.path }}
-          </option>
-        </select>
+        <UiControl as="Input" v-model="slot.value" class="calc__guide-input" type="text" :placeholder="slot.label" />
+        <UiControl
+          as="Select"
+          :model-value="''"
+          :options="guideElementOptions"
+          placeholder="从元素选…"
+          class="calc__guide-select"
+          aria-label="从参与元素填入"
+          @update:model-value="(path: string) => onSlotElementChange(index, path)"
+        />
       </div>
       <div class="calc__guide-foot">
-        <button type="button" class="calc__guide-cancel" @click="closeFunctionGuide">取消</button>
-        <button type="button" class="calc__guide-ok" @click="insertGuidedFunction">插入到算式</button>
+        <UiControl as="Button" class="calc__guide-cancel" @click="closeFunctionGuide">取消</UiControl>
+        <UiControl as="Button" class="calc__guide-ok" @click="insertGuidedFunction">插入到算式</UiControl>
       </div>
     </div>
 
@@ -470,76 +512,62 @@ function clear(): void {
     <div class="calc__options">
       <label class="calc__option">
         小数位
-        <input v-model="draft.precision" class="calc__small" type="number" min="0" max="10" placeholder="原始精度" />
+        <UiControl as="Input" v-model="draft.precision" class="calc__small" type="number" :min="0" :max="10" placeholder="原始精度" />
       </label>
       <label class="calc__option">
         输出形态
-        <select v-model="draft.output" class="calc__select">
-          <option value="number">数值</option>
-          <option value="text">文本</option>
-        </select>
+        <UiControl as="Select" v-model="draft.output" :options="outputOptions" class="calc__select" />
       </label>
       <label class="calc__option">
-        <input v-model="draft.emptyAsZero" type="checkbox" />空值按 0 参与
+        <UiControl as="Switch" :model-value="draft.emptyAsZero" @update:model-value="(v: boolean) => draft.emptyAsZero = v" />空值按 0 参与
       </label>
     </div>
 
     <div class="calc__section">参与条件（复用多条件组件契约）</div>
     <label class="calc__option">
-      <input v-model="draft.whenEnabled" type="checkbox" />仅当条件命中时才计算
+      <UiControl as="Switch" :model-value="draft.whenEnabled" @update:model-value="(v: boolean) => draft.whenEnabled = v" />仅当条件命中时才计算
     </label>
     <template v-if="draft.whenEnabled">
       <div class="calc__modes">
-        <button
+        <UiControl
           v-for="option in modeOptions"
           :key="option.value"
-          type="button"
+          as="Button"
           class="calc__mode"
           :class="{ 'is-active': draft.whenMode === option.value }"
           @click="draft.whenMode = option.value"
         >
           {{ option.label }}
-        </button>
+        </UiControl>
       </div>
       <div class="calc__rows">
         <div v-for="(row, index) in draft.whenRows" :key="index" class="calc__row">
-          <select v-model="row.left" class="calc__select calc__element" aria-label="条件左元素">
-            <option value="">选择元素</option>
-            <option v-for="element in elements" :key="element.nodeId" :value="element.path">
-              {{ element.label }}（{{ element.path }}）
-            </option>
-          </select>
-          <select
+          <UiControl as="Select" v-model="row.left" :options="elementOptions" placeholder="选择元素" class="calc__select calc__element" aria-label="条件左元素" />
+          <UiControl
             v-if="requiresAggregate(row.left)"
+            as="Select"
             v-model="row.aggregate"
+            :options="aggregateOptions"
             class="calc__select calc__aggregate"
             aria-label="条件聚合口径"
-          >
-            <option v-for="option in CALCULATION_AGGREGATES" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-          <select v-model="row.operator" class="calc__select calc__operator" aria-label="条件关系">
-            <option v-for="option in CONDITION_OPERATOR_OPTIONS" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-          <input v-if="!isUnary(row.operator)" v-model="row.value" class="calc__alias" type="text" placeholder="比较值" />
+          />
+          <UiControl as="Select" v-model="row.operator" :options="operatorOptions" class="calc__select calc__operator" aria-label="条件关系" />
+          <UiControl v-if="!isUnary(row.operator)" as="Input" v-model="row.value" class="calc__alias" type="text" placeholder="比较值" />
           <span v-else class="calc__placeholder">—</span>
-          <button type="button" class="calc__del" aria-label="删除条件" @click="removeConditionRow(index)">×</button>
+          <UiControl as="Button" class="calc__del" aria-label="删除条件" @click="removeConditionRow(index)">×</UiControl>
         </div>
         <div v-if="!draft.whenRows.length" class="calc__empty">还没有条件</div>
       </div>
-      <button type="button" class="calc__add" @click="addConditionRow">＋ 添加条件</button>
+      <UiControl as="Button" class="calc__add" @click="addConditionRow">＋ 添加条件</UiControl>
     </template>
 
     <div class="calc__preview">{{ preview }}</div>
 
     <template #footer>
-      <button type="button" class="calc__clear" @click="clear">移除计算</button>
+      <UiControl as="Button" class="calc__clear" @click="clear">移除计算</UiControl>
       <span class="calc__spacer" />
-      <button type="button" class="calc__cancel" @click="dialog.close()">取消</button>
-      <button type="button" class="calc__ok" @click="save">确定</button>
+      <UiControl as="Button" class="calc__cancel" @click="dialog.close()">取消</UiControl>
+      <UiControl as="Button" type="primary" class="calc__ok" @click="save">确定</UiControl>
     </template>
   </ModalShell>
   <CalculationHelpDialog v-if="helpVisible" @close="helpVisible = false" />

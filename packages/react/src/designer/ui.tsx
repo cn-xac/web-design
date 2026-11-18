@@ -47,6 +47,8 @@ export interface DesignerControlProps {
   /** 原生 title / spellCheck：设计器控件常需要提示文案与关闭拼写检查 */
   title?: string;
   spellCheck?: boolean;
+  onMouseEnter?: () => void;
+  onFocus?: () => void;
 }
 
 type Control = ComponentType<DesignerControlProps>;
@@ -59,13 +61,15 @@ const normalizeOptions = (options: DesignerControlProps["options"] = []): Select
   );
 
 function NativeButton(props: DesignerControlProps) {
-  const { type = "default", size = "small", disabled, className = "", onClick, children, title } = props;
+  const { type = "default", size = "small", disabled, className = "", onClick, children, title, onMouseEnter, onFocus } = props;
   return (
     <button
       type="button"
       disabled={disabled}
       title={title}
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onFocus={onFocus}
       className={`wbd-btn wbd-btn--${type}${size === "small" ? " wbd-sm" : ""} ${className}`.trim()}
     >
       {children}

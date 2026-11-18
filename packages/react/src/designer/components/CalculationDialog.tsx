@@ -39,6 +39,7 @@ import type {
 } from "@x-ac/web-design-core";
 import { useDesigner } from "../context";
 import type { CalculationTarget } from "../dialogs";
+import { UiControl } from "../ui";
 import { ModalShell } from "./ModalShell";
 import { CalculationHelpDialog } from "./CalculationHelpDialog";
 
@@ -124,7 +125,10 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
   const { store, state, notify } = useDesigner();
   const initial = findLocation(state.page.children ?? [], target.nodeId)?.node?.calculation;
   const [draft, setDraft] = useState<Draft>(() => normalize(initial));
-  const formulaRef = useRef<HTMLTextAreaElement | null>(null);
+  /** 算式输入框走 UiControl，用包裹层查询真实 textarea 以定位光标 */
+  const formulaHost = useRef<HTMLDivElement | null>(null);
+  const formulaInput = (): HTMLTextAreaElement | HTMLInputElement | null =>
+    formulaHost.current?.querySelector("textarea, input") ?? null;
   /** 当前查看说明的函数；悬停 / 聚焦时切换 */
   const [activeFn, setActiveFn] = useState<CalculationFunction | null>(null);
   /** 正在做参数引导的函数（与悬停说明卡分开） */
@@ -145,11 +149,33 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
   const functionGroups = useMemo(() => calculationFunctionGroups(), []);
   const modeOptions = CONDITION_MODE_OPTIONS.filter((option) => option.value !== "advanced");
 
+  /** UiControl 的 Select 统一用 { label, value } 候选 */
+  const elementOptions = elements.map((element) => ({
+    label: `${element.label}（${element.path}）`,
+    value: element.path,
+  }));
+  const aggregateOptions = CALCULATION_AGGREGATES.map((option) => ({
+    label: option.label,
+    value: option.value,
+  }));
+  const operatorOptions = CONDITION_OPERATOR_OPTIONS.map((option) => ({
+    label: option.label,
+    value: option.value,
+  }));
+  const outputOptions = [
+    { label: "数值", value: "number" },
+    { label: "文本", value: "text" },
+  ];
   const requiresAggregate = (path: string): boolean =>
     elements.find((element) => element.path === path)?.requiresAggregate ?? false;
 
   const labelOf = (path: string): string =>
     elements.find((element) => element.path === path)?.label ?? path;
+
+  const guideElementOptions = draft.operands.map((operand) => ({
+    label: `${operand.alias} · ${labelOf(operand.path) || operand.path}`,
+    value: operand.path,
+  }));
 
   const isUnary = (operator: ConditionOperator): boolean =>
     CONDITION_OPERATOR_OPTIONS.find((option) => option.value === operator)?.unary ?? false;
@@ -217,14 +243,14 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
 
   /** 把 token 插到算式光标处；textarea 没有焦点时追加到末尾 */
   function insertToken(token: string): void {
-    const element = formulaRef.current;
+    const element = formulaInput();
     const text = draft.formula;
     const start = element?.selectionStart ?? text.length;
     const end = element?.selectionEnd ?? start;
     const result = insertFormulaToken(text, token, start, end);
     patch({ formula: result.formula });
     const placeCursor = () => {
-      const el = formulaRef.current;
+      const el = formulaInput();
       if (!el) return;
       el.focus();
       el.setSelectionRange(result.cursor, result.cursor);
@@ -308,16 +334,16 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
       onClose={onClose}
       footer={
         <>
-          <button type="button" className="calc__clear" onClick={clear}>
+          <UiControl as="Button" className="calc__clear" onClick={clear}>
             移除计算
-          </button>
+          </UiControl>
           <span className="calc__spacer" />
-          <button type="button" className="calc__cancel" onClick={onClose}>
+          <UiControl as="Button" className="calc__cancel" onClick={onClose}>
             取消
-          </button>
-          <button type="button" className="calc__ok" onClick={save}>
+          </UiControl>
+          <UiControl as="Button" type="primary" className="calc__ok" onClick={save}>
             确定
-          </button>
+          </UiControl>
         </>
       }
     >
@@ -333,74 +359,67 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
         {draft.operands.map((operand, index) => (
           <div className="calc__row" key={index}>
             <span className="calc__no">{index + 1}</span>
-            <select
+            <UiControl
+              as="Select"
               className="calc__select calc__element"
               aria-label="参与元素"
+              placeholder="选择元素"
               value={operand.path}
-              onChange={(event) => updateOperand(index, { path: event.target.value })}
-            >
-              <option value="">选择元素</option>
-              {elements.map((element) => (
-                <option key={element.nodeId} value={element.path}>
-                  {element.label}（{element.path}）
-                </option>
-              ))}
-            </select>
+              options={elementOptions}
+              onChange={(value: string) => updateOperand(index, { path: value })}
+            />
             {requiresAggregate(operand.path) ? (
-              <select
+              <UiControl
+                as="Select"
                 className="calc__select calc__aggregate"
                 aria-label="聚合口径"
                 value={operand.aggregate}
-                onChange={(event) =>
-                  updateOperand(index, { aggregate: event.target.value as ConditionAggregate })
+                options={aggregateOptions}
+                onChange={(value: string) =>
+                  updateOperand(index, { aggregate: value as ConditionAggregate })
                 }
-              >
-                {CALCULATION_AGGREGATES.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              />
             ) : null}
-            <input
+            <UiControl
+              as="Input"
               className="calc__alias"
               type="text"
               aria-label="算式变量名"
               placeholder="变量名 A"
               value={operand.alias}
-              onChange={(event) => updateOperand(index, { alias: event.target.value })}
+              onChange={(value: string) => updateOperand(index, { alias: value })}
             />
             {operand.alias.trim() ? (
-              <button
-                type="button"
+              <UiControl
+                as="Button"
                 className="calc__insert"
                 title={`把 ${operand.alias} 插入算式`}
                 onClick={() => insertOperand(operand.alias)}
               >
                 插入
-              </button>
+              </UiControl>
             ) : null}
-            <button
-              type="button"
+            <UiControl
+              as="Button"
               className="calc__del"
               aria-label="删除参与元素"
               onClick={() => patch({ operands: draft.operands.filter((_, i) => i !== index) })}
             >
               ×
-            </button>
+            </UiControl>
           </div>
         ))}
         {!draft.operands.length ? <div className="calc__empty">还没有参与元素</div> : null}
       </div>
-      <button
-        type="button"
+      <UiControl
+        as="Button"
         className="calc__add"
         onClick={() =>
           patch({ operands: [...draft.operands, blankOperand(draft.operands.length)] })
         }
       >
         ＋ 添加元素
-      </button>
+      </UiControl>
 
       <div className="calc__section">算式</div>
       <div className="calc__builder">
@@ -409,15 +428,15 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
           {draft.operands
             .filter((operand) => operand.alias.trim())
             .map((operand) => (
-              <button
-                type="button"
+              <UiControl
+                as="Button"
                 key={operand.alias}
                 className="calc__chip"
                 title={`插入 ${operand.alias}：${labelOf(operand.path) || operand.path}`}
                 onClick={() => insertOperand(operand.alias)}
               >
                 {operand.alias}
-              </button>
+              </UiControl>
             ))}
           {!draft.operands.some((operand) => operand.alias.trim()) ? (
             <span className="calc__builder-empty">先在上方添加参与元素</span>
@@ -426,56 +445,58 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
         <div className="calc__token-row">
           <span className="calc__builder-label">运算符</span>
           {FORMULA_OPERATOR_BUTTONS.map((button) => (
-            <button
-              type="button"
+            <UiControl
+              as="Button"
               key={button.value}
               className="calc__token"
               onClick={() => insertToken(button.value)}
             >
               {button.label}
-            </button>
+            </UiControl>
           ))}
         </div>
         <div className="calc__token-row">
           <span className="calc__builder-label">数字</span>
           {FORMULA_NUMBER_BUTTONS.map((number) => (
-            <button type="button" key={number} className="calc__token" onClick={() => insertToken(number)}>
+            <UiControl as="Button" key={number} className="calc__token" onClick={() => insertToken(number)}>
               {number}
-            </button>
+            </UiControl>
           ))}
         </div>
       </div>
-      <textarea
-        ref={formulaRef}
-        className="calc__formula wb-mono"
-        rows={3}
-        spellCheck={false}
-        placeholder="例如：A * B，或 ROUND(SUM(A, B), 2)"
-        value={draft.formula}
-        onChange={(event) => patch({ formula: event.target.value })}
-      />
+      <div ref={formulaHost}>
+        <UiControl
+          as="Input"
+          className="calc__formula wb-mono"
+          rows={3}
+          spellCheck={false}
+          placeholder="例如：A * B，或 ROUND(SUM(A, B), 2)"
+          value={draft.formula}
+          onChange={(value: string) => patch({ formula: value })}
+        />
+      </div>
       <div className={`calc__tip${formulaError ? " is-error" : ""}`}>
         {formulaError || "用变量名引用参与元素；支持 + - * / %、比较、三元与括号。"}
       </div>
 
       <div className="calc__fn-title">
         <span className="calc__fn-label">高级函数（点函数名 → 填参数 → 插入算式）</span>
-        <button
-          type="button"
+        <UiControl
+          as="Button"
           className="calc__help-btn"
           title="查看完整使用说明（通用规则 / 30 个函数 / 业务配方 / 排错）"
           aria-label="查看完整使用说明"
           onClick={() => setHelpVisible(true)}
         >
           ?
-        </button>
+        </UiControl>
       </div>
       {functionGroups.map((group) => (
         <div className="calc__fn-group" key={group.group}>
           <span className="calc__fn-group-name">{group.group}</span>
           {group.items.map((fn) => (
-            <button
-              type="button"
+            <UiControl
+              as="Button"
               className="calc__fn"
               key={fn.name}
               title={`${fn.signature} — ${fn.description}`}
@@ -484,7 +505,7 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
               onClick={() => beginFunctionGuide(fn)}
             >
               {fn.name}
-            </button>
+            </UiControl>
           ))}
         </div>
       ))}
@@ -494,52 +515,46 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
           <div className="calc__guide-head">
             <b>{guideFn.name}</b>
             <span>逐项填入，或点选参与元素的别名</span>
-            <button
-              type="button"
+            <UiControl
+              as="Button"
               className="calc__guide-close"
               aria-label="取消参数引导"
               onClick={closeFunctionGuide}
             >
               ×
-            </button>
+            </UiControl>
           </div>
           {argSlots.map((slot, index) => (
             <div className="calc__guide-row" key={`${guideFn.name}-${index}`}>
               <span className="calc__guide-label">{slot.label}</span>
-              <input
+              <UiControl
+                as="Input"
                 className="calc__guide-input"
                 type="text"
                 placeholder={slot.label}
                 value={slot.value}
-                onChange={(event) => updateArgSlot(index, event.target.value)}
+                onChange={(value: string) => updateArgSlot(index, value)}
               />
-              <select
+              <UiControl
+                as="Select"
                 className="calc__guide-select"
                 aria-label="从参与元素填入"
-                defaultValue=""
-                onChange={(event) => {
-                  if (event.target.value) {
-                    setSlotFromElement(index, event.target.value);
-                    event.target.value = "";
-                  }
+                value=""
+                options={guideElementOptions}
+                placeholder="从元素选…"
+                onChange={(value: string) => {
+                  if (value) setSlotFromElement(index, value);
                 }}
-              >
-                <option value="">从元素选…</option>
-                {draft.operands.map((operand) => (
-                  <option key={operand.path} value={operand.path}>
-                    {operand.alias} · {labelOf(operand.path) || operand.path}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           ))}
           <div className="calc__guide-foot">
-            <button type="button" className="calc__guide-cancel" onClick={closeFunctionGuide}>
+            <UiControl as="Button" className="calc__guide-cancel" onClick={closeFunctionGuide}>
               取消
-            </button>
-            <button type="button" className="calc__guide-ok" onClick={insertGuidedFunction}>
+            </UiControl>
+            <UiControl as="Button" className="calc__guide-ok" onClick={insertGuidedFunction}>
               插入到算式
-            </button>
+            </UiControl>
           </div>
         </div>
       ) : null}
@@ -573,32 +588,32 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
       <div className="calc__options">
         <label className="calc__option">
           小数位
-          <input
+          <UiControl
+            as="Input"
             className="calc__small"
             type="number"
             min={0}
             max={10}
             placeholder="原始精度"
             value={draft.precision}
-            onChange={(event) => patch({ precision: event.target.value })}
+            onChange={(value: string) => patch({ precision: value })}
           />
         </label>
         <label className="calc__option">
           输出形态
-          <select
+          <UiControl
+            as="Select"
             className="calc__select"
             value={draft.output}
-            onChange={(event) => patch({ output: event.target.value as CalculationOutput })}
-          >
-            <option value="number">数值</option>
-            <option value="text">文本</option>
-          </select>
+            options={outputOptions}
+            onChange={(value: string) => patch({ output: value as CalculationOutput })}
+          />
         </label>
         <label className="calc__option">
-          <input
-            type="checkbox"
-            checked={draft.emptyAsZero}
-            onChange={(event) => patch({ emptyAsZero: event.target.checked })}
+          <UiControl
+            as="Switch"
+            value={draft.emptyAsZero}
+            onChange={(value: boolean) => patch({ emptyAsZero: value })}
           />
           空值按 0 参与
         </label>
@@ -606,10 +621,10 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
 
       <div className="calc__section">参与条件（复用多条件组件契约）</div>
       <label className="calc__option">
-        <input
-          type="checkbox"
-          checked={draft.whenEnabled}
-          onChange={(event) => patch({ whenEnabled: event.target.checked })}
+        <UiControl
+          as="Switch"
+          value={draft.whenEnabled}
+          onChange={(value: boolean) => patch({ whenEnabled: value })}
         />
         仅当条件命中时才计算
       </label>
@@ -617,77 +632,64 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
         <>
           <div className="calc__modes">
             {modeOptions.map((option) => (
-              <button
-                type="button"
+              <UiControl
+                as="Button"
                 key={option.value}
                 className={`calc__mode${draft.whenMode === option.value ? " is-active" : ""}`}
                 onClick={() => patch({ whenMode: option.value })}
               >
                 {option.label}
-              </button>
+              </UiControl>
             ))}
           </div>
           <div className="calc__rows">
             {draft.whenRows.map((row, index) => (
               <div className="calc__row" key={index}>
-                <select
+                <UiControl
+                  as="Select"
                   className="calc__select calc__element"
                   aria-label="条件左元素"
+                  placeholder="选择元素"
                   value={row.left}
-                  onChange={(event) => updateConditionRow(index, { left: event.target.value })}
-                >
-                  <option value="">选择元素</option>
-                  {elements.map((element) => (
-                    <option key={element.nodeId} value={element.path}>
-                      {element.label}（{element.path}）
-                    </option>
-                  ))}
-                </select>
+                  options={elementOptions}
+                  onChange={(value: string) => updateConditionRow(index, { left: value })}
+                />
                 {requiresAggregate(row.left) ? (
-                  <select
+                  <UiControl
+                    as="Select"
                     className="calc__select calc__aggregate"
                     aria-label="条件聚合口径"
                     value={row.aggregate}
-                    onChange={(event) =>
-                      updateConditionRow(index, {
-                        aggregate: event.target.value as ConditionAggregate,
-                      })
+                    options={aggregateOptions}
+                    onChange={(value: string) =>
+                      updateConditionRow(index, { aggregate: value as ConditionAggregate })
                     }
-                  >
-                    {CALCULATION_AGGREGATES.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 ) : null}
-                <select
+                <UiControl
+                  as="Select"
                   className="calc__select calc__operator"
                   aria-label="条件关系"
                   value={row.operator}
-                  onChange={(event) =>
-                    updateConditionRow(index, { operator: event.target.value as ConditionOperator })
+                  options={operatorOptions}
+                  onChange={(value: string) =>
+                    updateConditionRow(index, { operator: value as ConditionOperator })
                   }
-                >
-                  {CONDITION_OPERATOR_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                />
                 {!isUnary(row.operator) ? (
-                  <input
+                  <UiControl
+                    as="Input"
                     className="calc__alias"
                     type="text"
                     placeholder="比较值"
                     value={row.value}
-                    onChange={(event) => updateConditionRow(index, { value: event.target.value })}
+                    onChange={(value: string) => updateConditionRow(index, { value })}
                   />
                 ) : (
                   <span className="calc__placeholder">—</span>
                 )}
-                <button
-                  type="button"
+                <UiControl
+                  as="Button"
                   className="calc__del"
                   aria-label="删除条件"
                   onClick={() =>
@@ -695,18 +697,18 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
                   }
                 >
                   ×
-                </button>
+                </UiControl>
               </div>
             ))}
             {!draft.whenRows.length ? <div className="calc__empty">还没有条件</div> : null}
           </div>
-          <button
-            type="button"
+          <UiControl
+            as="Button"
             className="calc__add"
             onClick={() => patch({ whenRows: [...draft.whenRows, blankConditionRow()] })}
           >
             ＋ 添加条件
-          </button>
+          </UiControl>
         </>
       ) : null}
 
