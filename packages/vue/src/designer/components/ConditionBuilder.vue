@@ -4,6 +4,8 @@
  *
  * 数据模型与求值全部在 core，本组件只负责编辑 UI：
  * - 每行一个条件：序号 + 左元素 + 关系 + 右值；特殊场景可勾选「仅值」；
+ * - 右值控件由左元素类型决定（core 统一判定）：选项类直接选该元素的选项，
+ *   开关选真/假，数字/日期用对应输入，文本类才用文本框；
  * - 条件间：并且 / 或者 / 高级（按序号组合，如 1 and (2 or 3)）；
  * - 子表单内元素只能选同一子表单内的字段（core 的清单已裁剪）；
  * - 子表单外引用明细字段时显示聚合口径，缺省求和。
@@ -18,6 +20,7 @@ import {
   VISIBILITY_ACTIONS,
   collectConditionElements,
   findLocation,
+  resolveConditionValueControlByPath,
   validateAdvancedExpression,
   type ConditionGroup,
   type ConditionMode,
@@ -105,6 +108,22 @@ function requiresAggregate(left: string | undefined): boolean {
 
 function isUnary(operator: ConditionRow["operator"]): boolean {
   return CONDITION_OPERATOR_OPTIONS.find((option) => option.value === operator)?.unary ?? false;
+}
+
+/** 右值控件完全由 core 判定，本组件只按描述渲染，不自带类型映射表 */
+function controlOf(row: DraftRow) {
+  return resolveConditionValueControlByPath(store.page, elements.value, row.left, row.operator, row.value);
+}
+
+/** 切换左元素时清空旧值：旧值属于上一个元素的选项，留着只会命中错误分支 */
+function onLeftChange(row: DraftRow, event: Event): void {
+  row.left = (event.target as HTMLSelectElement).value;
+  row.value = "";
+}
+
+/** 右侧下拉选值：core 把选项 value 定为落库值，直接写入即可 */
+function onValueChange(row: DraftRow, event: Event): void {
+  row.value = (event.target as HTMLSelectElement).value;
 }
 
 function addRow(): void {
@@ -242,7 +261,12 @@ function setMode(mode: ConditionMode): void {
         <span class="cond__no">{{ index + 1 }}</span>
 
         <template v-if="!row.valueOnly">
-          <select v-model="row.left" class="cond__select cond__left" aria-label="左元素">
+          <select
+            :value="row.left ?? ''"
+            class="cond__select cond__left"
+            aria-label="左元素"
+            @change="onLeftChange(row, $event)"
+          >
             <option value="">选择元素</option>
             <option v-for="element in elements" :key="element.nodeId" :value="element.path">
               {{ element.label }}（{{ element.path }}）
@@ -266,13 +290,29 @@ function setMode(mode: ConditionMode): void {
             </option>
           </select>
 
-          <input
-            v-if="!isUnary(row.operator)"
-            v-model="row.value"
-            class="cond__value"
-            type="text"
-            placeholder="值，或 &#123;&#123;路径&#125;&#125;"
-          />
+          <template v-if="controlOf(row).kind !== 'none'">
+            <select
+              v-if="controlOf(row).kind === 'options' || controlOf(row).kind === 'boolean'"
+              :value="String(row.value ?? '')"
+              class="cond__select cond__value cond__value-select"
+              aria-label="右侧值"
+              @change="onValueChange(row, $event)"
+            >
+              <option value="">请选择</option>
+              <option v-for="option in controlOf(row).options" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+            <input
+              v-else
+              v-model="row.value"
+              class="cond__value"
+              :type="controlOf(row).inputType ?? 'text'"
+              aria-label="右侧值"
+              :placeholder="controlOf(row).kind === 'legacy' ? '旧值，请重新选择' : '请输入值'"
+              :title="controlOf(row).hint"
+            />
+          </template>
           <span v-else class="cond__value-placeholder">—</span>
         </template>
 

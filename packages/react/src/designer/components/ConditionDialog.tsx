@@ -3,6 +3,8 @@
  *
  * 数据模型与求值全部在 core，本组件只负责编辑 UI：
  * - 每行一个条件：序号 + 左元素 + 关系 + 右值；特殊场景可勾选「仅值」；
+ * - 右值控件由左元素类型决定（core 统一判定）：选项类直接选该元素的选项，
+ *   开关选真/假，数字/日期用对应输入，文本类才用文本框；
  * - 条件间：并且 / 或者 / 高级（按序号组合，如 1 and (2 or 3)）；
  * - 子表单内元素只能选同一子表单内的字段（core 的清单已裁剪）；
  * - 子表单外引用明细字段时显示聚合口径，缺省求和。
@@ -17,6 +19,7 @@ import {
   VISIBILITY_ACTIONS,
   collectConditionElements,
   findLocation,
+  resolveConditionValueControlByPath,
   validateAdvancedExpression,
 } from "@x-ac/web-design-core";
 import type {
@@ -87,6 +90,14 @@ export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
 
   const isUnary = (operator?: ConditionRow["operator"]): boolean =>
     CONDITION_OPERATOR_OPTIONS.find((option) => option.value === operator)?.unary ?? false;
+
+  /** 右值控件完全由 core 判定，本组件只按描述渲染，不自带类型映射表 */
+  const controlOf = (row: DraftRow) =>
+    resolveConditionValueControlByPath(state.page, elements, row.left, row.operator, row.value);
+
+  /** 切换左元素时清空旧值：旧值属于上一个元素的选项，留着只会命中错误分支 */
+  const onLeftChange = (index: number, left: string): void =>
+    updateRow(index, { left, value: "" });
 
   const patch = (partial: Partial<Draft>): void => setDraft((current) => ({ ...current, ...partial }));
 
@@ -240,7 +251,7 @@ export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
                   className="cond__select cond__left"
                   aria-label="左元素"
                   value={row.left ?? ""}
-                  onChange={(event) => updateRow(index, { left: event.target.value })}
+                  onChange={(event) => onLeftChange(index, event.target.value)}
                 >
                   <option value="">选择元素</option>
                   {elements.map((element) => (
@@ -282,14 +293,32 @@ export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
                   ))}
                 </select>
 
-                {!isUnary(row.operator) ? (
-                  <input
-                    className="cond__value"
-                    type="text"
-                    placeholder="值，或 {{路径}}"
-                    value={String(row.value ?? "")}
-                    onChange={(event) => updateRow(index, { value: event.target.value })}
-                  />
+                {controlOf(row).kind !== "none" ? (
+                  controlOf(row).kind === "options" || controlOf(row).kind === "boolean" ? (
+                    <select
+                      className="cond__select cond__value cond__value-select"
+                      aria-label="右侧值"
+                      value={String(row.value ?? "")}
+                      onChange={(event) => updateRow(index, { value: event.target.value })}
+                    >
+                      <option value="">请选择</option>
+                      {controlOf(row).options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      className="cond__value"
+                      type={controlOf(row).inputType ?? "text"}
+                      aria-label="右侧值"
+                      placeholder={controlOf(row).kind === "legacy" ? "旧值，请重新选择" : "请输入值"}
+                      title={controlOf(row).hint}
+                      value={String(row.value ?? "")}
+                      onChange={(event) => updateRow(index, { value: event.target.value })}
+                    />
+                  )
                 ) : (
                   <span className="cond__value-placeholder">—</span>
                 )}
