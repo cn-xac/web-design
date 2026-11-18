@@ -6,19 +6,14 @@
  */
 
 .wbd-btn {
+  /* unocss：按钮皮肤由 shortcut 统一表达，构建期展开 */
+  @apply wbd-ghost;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--wb-line);
-  border-radius: 5px;
-  background: #fff;
-  color: var(--wb-ink2);
-  font-size: 12px;
   line-height: 1;
-  cursor: pointer;
   transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
 }
 .wbd-btn:hover:not(:disabled) {
@@ -54,19 +49,13 @@
 }
 
 .wbd-input {
+  /* unocss：控件皮肤由 shortcut 统一表达，构建期展开为自包含 CSS */
+  @apply wbd-field;
   width: 100%;
-  min-width: 0;
   height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--wb-line);
-  border-radius: 5px;
-  background: #fff;
-  color: var(--wb-ink);
-  font-size: 12px;
   line-height: 1.5;
   outline: none;
   transition: border-color 0.12s ease;
-  box-sizing: border-box;
 }
 .wbd-input:focus {
   border-color: var(--wb-primary);

@@ -437,8 +437,8 @@ function setMode(mode: ConditionMode): void {
   font-size: 12px;
   color: var(--wb-ink3);
 }
-.cond__select,
-.cond__value {
+.cond__select:where(input,select,textarea),
+.cond__value:where(input,select,textarea){
   border: 1px solid var(--wb-line);
   border-radius: 5px;
   background: #fff;

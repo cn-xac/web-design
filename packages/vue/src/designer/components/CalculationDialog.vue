@@ -611,10 +611,10 @@ function clear(): void {
   font-size: 12px;
   color: var(--wb-ink3);
 }
-.calc__select,
-.calc__alias,
-.calc__formula,
-.calc__small {
+.calc__select:where(input,select,textarea),
+.calc__alias:where(input,select,textarea),
+.calc__formula:where(input,select,textarea),
+.calc__small:where(input,select,textarea){
   border: 1px solid var(--wb-line);
   border-radius: 5px;
   background: #fff;
@@ -938,8 +938,8 @@ function clear(): void {
   font-size: 11.5px;
   color: var(--wb-ink2);
 }
-.calc__guide-input,
-.calc__guide-select {
+.calc__guide-input:where(input,select,textarea),
+.calc__guide-select:where(input,select,textarea){
   border: 1px solid var(--wb-line);
   border-radius: 5px;
   background: #fff;

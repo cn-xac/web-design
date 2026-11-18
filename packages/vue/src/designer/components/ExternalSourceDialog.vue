@@ -742,7 +742,7 @@ function remove(): void {
   font-size: 11.5px;
   color: var(--wb-ink3);
 }
-.ext__input {
+.ext__input:where(input,select,textarea){
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--wb-line);

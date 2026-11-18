@@ -358,7 +358,7 @@ function backToList(): void {
   opacity: 0.35;
   cursor: not-allowed;
 }
-.title-input {
+.title-input:where(input,select,textarea){
   width: 220px;
   padding: 4px 8px;
   border: 1px solid transparent;

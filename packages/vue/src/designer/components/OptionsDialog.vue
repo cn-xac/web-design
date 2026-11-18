@@ -363,7 +363,7 @@ function openExternal(): void {
   color: var(--wb-danger);
   font-style: normal;
 }
-.opts__input {
+.opts__input:where(input,select,textarea){
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--wb-line);
@@ -472,7 +472,7 @@ function openExternal(): void {
   border-radius: 3px;
   padding: 0 4px;
 }
-.opts__text {
+.opts__text:where(input,select,textarea){
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--wb-line);

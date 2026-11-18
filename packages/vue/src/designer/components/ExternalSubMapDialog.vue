@@ -188,7 +188,7 @@ function save(): void {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sub__input {
+.sub__input:where(input,select,textarea){
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--wb-line);

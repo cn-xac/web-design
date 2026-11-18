@@ -2,6 +2,7 @@ import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import dts from "vite-plugin-dts";
+import UnoCSS from "unocss/vite";
 
 /**
  * 库模式构建：
@@ -13,6 +14,9 @@ import dts from "vite-plugin-dts";
 export default defineConfig({
   plugins: [
     vue(),
+    // 原子类在构建期展开进 style.css；下游不依赖 unocss 运行时
+    // 配置由 unocss 从项目根自动发现（uno.config.ts），不显式传 Windows 路径
+    UnoCSS(),
     dts({
       tsconfigPath: "./tsconfig.json",
       entryRoot: "src",

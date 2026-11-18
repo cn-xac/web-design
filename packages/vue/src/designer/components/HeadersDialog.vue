@@ -68,7 +68,7 @@ function confirm(): void {
   gap: 6px;
   align-items: center;
 }
-.hdr__input {
+.hdr__input:where(input,select,textarea){
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--wb-line);

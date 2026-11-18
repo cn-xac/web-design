@@ -55,19 +55,14 @@
  */
 
 .wbd-btn {
+  /* unocss：按钮皮肤由 shortcut 统一表达，构建期展开 */
+  @apply wbd-ghost;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--wb-line);
-  border-radius: 5px;
-  background: #fff;
-  color: var(--wb-ink2);
-  font-size: 12px;
   line-height: 1;
-  cursor: pointer;
   transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
 }
 .wbd-btn:hover:not(:disabled) {
@@ -103,19 +98,13 @@
 }
 
 .wbd-input {
+  /* unocss：控件皮肤由 shortcut 统一表达，构建期展开为自包含 CSS（与 Vue ui.css 镜像一致） */
+  @apply wbd-field;
   width: 100%;
-  min-width: 0;
   height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--wb-line);
-  border-radius: 5px;
-  background: #fff;
-  color: var(--wb-ink);
-  font-size: 12px;
   line-height: 1.5;
   outline: none;
   transition: border-color 0.12s ease;
-  box-sizing: border-box;
 }
 .wbd-input:focus {
   border-color: var(--wb-primary);
@@ -260,7 +249,7 @@ select.wbd-input.wbd-sm {
   opacity: 0.35;
   cursor: not-allowed;
 }
-.title-input {
+.title-input:where(input,select,textarea){
   width: 220px;
   padding: 4px 8px;
   border: 1px solid transparent;
@@ -1615,7 +1604,8 @@ select.wbd-input.wbd-sm {
 .cond__expression { width: 100%; box-sizing: border-box; margin-bottom: 4px; padding: 6px 8px; border: 1px solid var(--wb-line); border-radius: 5px; font-size: 12px; font-family: var(--wb-mono); }
 .cond__row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 6px; }
 .cond__no { width: 18px; flex: none; text-align: center; font-size: 12px; color: var(--wb-ink3); }
-.cond__select, .cond__value { min-width: 0; box-sizing: border-box; border: 1px solid var(--wb-line); border-radius: 5px; background: #fff; padding: 5px 6px; font-size: 12px; font-family: inherit; color: var(--wb-ink); }
+.cond__select:where(input,select,textarea),
+.cond__value:where(input,select,textarea){ min-width: 0; box-sizing: border-box; border: 1px solid var(--wb-line); border-radius: 5px; background: #fff; padding: 5px 6px; font-size: 12px; font-family: inherit; color: var(--wb-ink); }
 .cond__left { flex: 1 1 140px; }
 .cond__aggregate { flex: 0 0 76px; }
 .cond__operator { flex: 0 0 86px; }
@@ -1670,7 +1660,7 @@ select.wbd-input.wbd-sm {
 
 /* ---------------- 绑定数据选择器 ---------------- */
 .picker { display: flex; flex-direction: column; gap: 10px; min-height: 320px; }
-.picker__search { width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid var(--wb-line); border-radius: 6px; font-family: inherit; font-size: 12.5px; color: var(--wb-ink); }
+.picker__search:where(input,select,textarea){ width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid var(--wb-line); border-radius: 6px; font-family: inherit; font-size: 12.5px; color: var(--wb-ink); }
 .picker__search:focus { outline: none; border-color: var(--wb-primary); box-shadow: 0 0 0 3px rgba(47, 75, 255, 0.1); }
 .picker__list { flex: 1; min-height: 0; max-height: 46vh; overflow: auto; border: 1px solid var(--wb-line-soft); border-radius: 8px; padding: 4px; }
 .picker__group { margin-bottom: 8px; }
@@ -1696,7 +1686,7 @@ select.wbd-input.wbd-sm {
 .opts__cell { display: flex; flex-direction: column; gap: 4px; }
 .opts__label { font-size: 11.5px; color: var(--wb-ink3); }
 .opts__req { color: var(--wb-danger); font-style: normal; }
-.opts__input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--wb-line); border-radius: 5px; font-size: 12.5px; font-family: inherit; color: var(--wb-ink); background: #fff; }
+.opts__input:where(input,select,textarea){ width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--wb-line); border-radius: 5px; font-size: 12.5px; font-family: inherit; color: var(--wb-ink); background: #fff; }
 .opts__input:focus { outline: none; border-color: var(--wb-primary); box-shadow: 0 0 0 3px rgba(47, 75, 255, 0.1); }
 .opts__section { margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--wb-line-soft); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--wb-ink3); }
 .opts__params { display: flex; flex-direction: column; gap: 6px; }
@@ -1712,7 +1702,7 @@ select.wbd-input.wbd-sm {
 .opts__adv:hover { text-decoration: underline; }
 .opts__hint { margin-bottom: 10px; font-size: 12px; color: var(--wb-ink2); line-height: 1.7; }
 .opts__hint code { font-family: var(--wb-mono); background: #fafbfd; border: 1px solid var(--wb-line-soft); border-radius: 3px; padding: 0 4px; }
-.opts__text { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--wb-line); border-radius: 6px; font-size: 12.5px; line-height: 1.7; color: var(--wb-ink); resize: vertical; }
+.opts__text:where(input,select,textarea){ width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--wb-line); border-radius: 6px; font-size: 12.5px; line-height: 1.7; color: var(--wb-ink); resize: vertical; }
 .opts__text:focus { outline: none; border-color: var(--wb-primary); box-shadow: 0 0 0 3px rgba(47, 75, 255, 0.1); }
 .opts__preview-head { display: flex; align-items: center; gap: 6px; margin: 12px 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--wb-ink3); }
 .opts__count { font-weight: 400; letter-spacing: 0; }
@@ -1737,7 +1727,7 @@ select.wbd-input.wbd-sm {
 .ext__cell { display: flex; flex-direction: column; gap: 4px; }
 .ext__cell--grow { flex: 1; }
 .ext__label { font-size: 11.5px; color: var(--wb-ink3); }
-.ext__input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--wb-line); border-radius: 5px; font-size: 12.5px; font-family: inherit; color: var(--wb-ink); background: #fff; }
+.ext__input:where(input,select,textarea){ width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--wb-line); border-radius: 5px; font-size: 12.5px; font-family: inherit; color: var(--wb-ink); background: #fff; }
 .ext__input:focus { outline: none; border-color: var(--wb-primary); box-shadow: 0 0 0 3px rgba(47, 75, 255, 0.1); }
 .ext__static { padding: 6px 8px; border: 1px dashed var(--wb-line); border-radius: 5px; font-size: 12.5px; color: var(--wb-ink2); background: #fbfcfe; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ext__ghost { border: 1px solid var(--wb-line); border-radius: 5px; background: #fff; padding: 5px 10px; font-size: 12px; font-family: inherit; color: var(--wb-ink2); cursor: pointer; text-align: left; }
@@ -1767,7 +1757,7 @@ select.wbd-input.wbd-sm {
 .hdr__hint { margin-bottom: 10px; font-size: 12px; color: var(--wb-ink2); }
 .hdr__rows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 .hdr__row { display: grid; grid-template-columns: 1fr 1fr 24px; gap: 6px; align-items: center; }
-.hdr__input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--wb-line); border-radius: 5px; font-size: 12px; color: var(--wb-ink); }
+.hdr__input:where(input,select,textarea){ width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--wb-line); border-radius: 5px; font-size: 12px; color: var(--wb-ink); }
 .hdr__input:focus { outline: none; border-color: var(--wb-primary); }
 .hdr__del { border: none; background: transparent; color: var(--wb-ink3); font-size: 15px; cursor: pointer; line-height: 1; }
 .hdr__del:hover { color: var(--wb-danger); }
@@ -1788,7 +1778,7 @@ select.wbd-input.wbd-sm {
 .sub__col--field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .sub__label { font-size: 12.5px; color: var(--wb-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sub__code { font-family: var(--wb-mono); font-size: 11px; color: var(--wb-ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sub__input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--wb-line); border-radius: 5px; font-size: 12.5px; font-family: inherit; color: var(--wb-ink); background: #fff; }
+.sub__input:where(input,select,textarea){ width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--wb-line); border-radius: 5px; font-size: 12.5px; font-family: inherit; color: var(--wb-ink); background: #fff; }
 .sub__input:focus { outline: none; border-color: var(--wb-primary); box-shadow: 0 0 0 3px rgba(47, 75, 255, 0.1); }
 .sub__empty { padding: 14px; border: 1px dashed var(--wb-line); border-radius: 6px; text-align: center; font-size: 12px; color: var(--wb-ink3); }
 .sub__spacer { flex: 1; }
@@ -1819,7 +1809,10 @@ select.wbd-input.wbd-sm {
 .calc__rows { max-height: 200px; overflow: auto; border: 1px solid var(--wb-line-soft); border-radius: 8px; background: #fbfcfe; }
 .calc__row { display: flex; align-items: center; gap: 6px; padding: 7px 8px; border-bottom: 1px solid var(--wb-line-soft); flex-wrap: wrap; }
 .calc__no { width: 18px; flex: none; text-align: center; font-size: 12px; color: var(--wb-ink3); }
-.calc__select, .calc__alias, .calc__formula, .calc__small { border: 1px solid var(--wb-line); border-radius: 5px; background: #fff; padding: 5px 7px; font-size: 12px; font-family: inherit; color: var(--wb-ink); min-width: 0; }
+.calc__select:where(input,select,textarea),
+.calc__alias:where(input,select,textarea),
+.calc__formula:where(input,select,textarea),
+.calc__small:where(input,select,textarea){ border: 1px solid var(--wb-line); border-radius: 5px; background: #fff; padding: 5px 7px; font-size: 12px; font-family: inherit; color: var(--wb-ink); min-width: 0; }
 .calc__element { flex: 1 1 180px; }
 .calc__aggregate { flex: 0 0 80px; }
 .calc__operator { flex: 0 0 90px; }
@@ -1903,7 +1896,8 @@ select.wbd-input.wbd-sm {
 .calc__guide-close { margin-left: auto; border: none; background: transparent; font-size: 15px; color: var(--wb-ink3); cursor: pointer; }
 .calc__guide-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .calc__guide-label { width: 108px; flex: none; font-size: 11.5px; color: var(--wb-ink2); }
-.calc__guide-input, .calc__guide-select { border: 1px solid var(--wb-line); border-radius: 5px; background: #fff; padding: 4px 6px; font-size: 12px; font-family: inherit; color: var(--wb-ink); min-width: 0; }
+.calc__guide-input:where(input,select,textarea),
+.calc__guide-select:where(input,select,textarea){ border: 1px solid var(--wb-line); border-radius: 5px; background: #fff; padding: 4px 6px; font-size: 12px; font-family: inherit; color: var(--wb-ink); min-width: 0; }
 .calc__guide-input { flex: 1 1 120px; }
 .calc__guide-select { flex: 0 0 160px; }
 .calc__guide-foot { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }

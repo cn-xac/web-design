@@ -117,7 +117,7 @@ function unbind(): void {
   gap: 10px;
   min-height: 320px;
 }
-.picker__search {
+.picker__search:where(input,select,textarea){
   width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--wb-line);
