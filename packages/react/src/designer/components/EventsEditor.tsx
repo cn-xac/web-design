@@ -57,9 +57,9 @@ function ActionRow({ action, onChangeAction, onRemove, onApplyArgs }: ActionRowP
           options={ACTION_OPTIONS}
           onChange={(value: unknown) => onChangeAction(String(value))}
         />
-        <button type="button" className="events__del" title="删除" onClick={onRemove}>
+        <UiControl as="Button" className="events__del" title="删除" onClick={onRemove}>
           ×
-        </button>
+        </UiControl>
       </div>
       <UiControl
         as="Input"

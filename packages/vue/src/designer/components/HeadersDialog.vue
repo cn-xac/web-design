@@ -11,6 +11,7 @@
  */
 import { useHeadersDialog } from "../dialogs";
 import ModalShell from "../ui/ModalShell.vue";
+import UiControl from "../ui/UiControl.vue";
 
 const dialog = useHeadersDialog();
 
@@ -33,28 +34,18 @@ function confirm(): void {
 
     <div class="hdr__rows">
       <div v-for="(row, index) in dialog.rows.value" :key="index" class="hdr__row">
-        <input
-          v-model="row.key"
-          class="hdr__input wb-mono"
-          placeholder="名称，如 Authorization"
-          spellcheck="false"
-        />
-        <input
-          v-model="row.value"
-          class="hdr__input wb-mono"
-          placeholder="取值"
-          spellcheck="false"
-        />
-        <button type="button" class="hdr__del" title="删除" @click="remove(index)">×</button>
+        <UiControl as="Input" v-model="row.key" class="hdr__input wb-mono" placeholder="名称，如 Authorization" spellcheck="false" />
+        <UiControl as="Input" v-model="row.value" class="hdr__input wb-mono" placeholder="取值" spellcheck="false" />
+        <UiControl as="Button" class="hdr__del" title="删除" @click="remove(index)">×</UiControl>
       </div>
       <div v-if="!dialog.rows.value.length" class="hdr__empty">还没有请求头</div>
     </div>
 
-    <button type="button" class="hdr__add" @click="add">+ 添加请求头</button>
+    <UiControl as="Button" class="hdr__add" @click="add">+ 添加请求头</UiControl>
 
     <template #footer>
-      <button type="button" class="hdr__cancel" @click="dialog.cancel()">取消</button>
-      <button type="button" class="hdr__ok" @click="confirm">确定</button>
+      <UiControl as="Button" class="hdr__cancel" @click="dialog.cancel()">取消</UiControl>
+      <UiControl as="Button" type="primary" class="hdr__ok" @click="confirm">确定</UiControl>
     </template>
   </ModalShell>
 </template>

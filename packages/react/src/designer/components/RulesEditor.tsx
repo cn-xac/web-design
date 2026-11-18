@@ -142,14 +142,13 @@ export function RulesEditor() {
                 disabled={rule.type === "required"}
                 onChange={(value: unknown) => changeType(index, String(value) as RuleType)}
               />
-              <button
-                type="button"
+              <UiControl as="Button"
                 className="rule__del"
                 title="删除该规则"
                 onClick={() => remove(index)}
               >
                 ×
-              </button>
+              </UiControl>
             </div>
 
             {kind === "number" || kind === "length" ? (

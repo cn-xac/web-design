@@ -147,20 +147,19 @@ export function StyleEditor() {
             <div className="box__actions">
               <div className="box__modes">
                 {SPACING_MODES.map((mode) => (
-                  <button
-                    type="button"
+                  <UiControl as="Button"
                     key={mode.value}
                     className={`box__mode${modes[key] === mode.value ? " is-on" : ""}`}
                     title={mode.title}
                     onClick={() => setMode(key, mode.value)}
                   >
                     {mode.label}
-                  </button>
+                  </UiControl>
                 ))}
               </div>
-              <button type="button" className="box__clear" title="清除" onClick={() => clearSpacing(key)}>
+              <UiControl as="Button" className="box__clear" title="清除" onClick={() => clearSpacing(key)}>
                 清除
-              </button>
+              </UiControl>
             </div>
           </div>
 
@@ -224,15 +223,14 @@ export function StyleEditor() {
                 <div className="box__preset-row" key={axis}>
                   <span>{axis === "v" ? "上下" : "左右"}</span>
                   {SPACING_PRESETS.map((px) => (
-                    <button
-                      type="button"
+                    <UiControl as="Button"
                       className="box__preset"
                       key={`${key}-${axis}-${px}`}
                       title={`${px}px`}
                       onClick={() => applyPreset(key, px, axis)}
                     >
                       {px}
-                    </button>
+                    </UiControl>
                   ))}
                 </div>
               ))
@@ -240,15 +238,14 @@ export function StyleEditor() {
               <div className="box__preset-row">
                 <span>全部</span>
                 {SPACING_PRESETS.map((px) => (
-                  <button
-                    type="button"
+                  <UiControl as="Button"
                     className="box__preset"
                     key={`${key}-${px}`}
                     title={`${px}px`}
                     onClick={() => applyPreset(key, px)}
                   >
                     {px}
-                  </button>
+                  </UiControl>
                 ))}
               </div>
             )}

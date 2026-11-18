@@ -5,6 +5,7 @@
 import { canOwnCalculation } from "@x-ac/web-design-core";
 import { useDesigner } from "../context";
 import { useDesignerDialogs } from "../dialogs";
+import { UiControl } from "../ui";
 
 export function CalculationTrigger() {
   const { state } = useDesigner();
@@ -17,8 +18,7 @@ export function CalculationTrigger() {
   const summary = config ? `${config.operands.length} 个元素 · ${config.formula}` : "未配置";
 
   return (
-    <button
-      type="button"
+    <UiControl as="Button"
       className="style__cond-btn style__calc-btn"
       disabled={!allowed}
       onClick={() =>
@@ -29,6 +29,6 @@ export function CalculationTrigger() {
       }
     >
       {summary} · 配置高级计算
-    </button>
+    </UiControl>
   );
 }

@@ -127,7 +127,7 @@ function styleValue(key: string): string {
         <span class="box__title">{{ key === "margin" ? "外边距 Margin" : "内边距 Padding" }}</span>
         <div class="box__actions">
           <div class="box__modes">
-            <button
+            <UiControl as="Button"
               v-for="m in SPACING_MODES"
               :key="m.value"
               class="box__mode"
@@ -136,9 +136,9 @@ function styleValue(key: string): string {
               @click="modes[key] = m.value"
             >
               {{ m.label }}
-            </button>
+            </UiControl>
           </div>
-          <button class="box__clear" title="清除" @click="clearSpacing(key)">清除</button>
+          <UiControl as="Button" class="box__clear" title="清除" @click="clearSpacing(key)">清除</UiControl>
         </div>
       </div>
 
@@ -192,7 +192,7 @@ function styleValue(key: string): string {
         <template v-if="modes[key] === 'pair'">
           <div v-for="axis in (['v', 'h'] as const)" :key="axis" class="box__preset-row">
             <span>{{ axis === "v" ? "上下" : "左右" }}</span>
-            <button
+            <UiControl as="Button"
               v-for="px in SPACING_PRESETS"
               :key="`${key}-${axis}-${px}`"
               class="box__preset"
@@ -200,13 +200,13 @@ function styleValue(key: string): string {
               @click="applyPreset(key, px, axis)"
             >
               {{ px }}
-            </button>
+            </UiControl>
           </div>
         </template>
         <!-- 其余模式：一排预设铺四边 -->
         <div v-else class="box__preset-row">
           <span>全部</span>
-          <button
+          <UiControl as="Button"
             v-for="px in SPACING_PRESETS"
             :key="`${key}-${px}`"
             class="box__preset"
@@ -214,7 +214,7 @@ function styleValue(key: string): string {
             @click="applyPreset(key, px)"
           >
             {{ px }}
-          </button>
+          </UiControl>
         </div>
       </div>
     </div>

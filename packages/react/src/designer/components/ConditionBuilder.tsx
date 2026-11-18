@@ -10,6 +10,7 @@
 import { CONDITION_MODE_OPTIONS } from "@x-ac/web-design-core";
 import { useDesigner } from "../context";
 import { useDesignerDialogs } from "../dialogs";
+import { UiControl } from "../ui";
 
 export function ConditionTrigger() {
   const { state } = useDesigner();
@@ -26,8 +27,7 @@ export function ConditionTrigger() {
   })();
 
   return (
-    <button
-      type="button"
+    <UiControl as="Button"
       className="style__cond-btn"
       onClick={() =>
         dialogs.openConditions({
@@ -37,7 +37,7 @@ export function ConditionTrigger() {
       }
     >
       {summary} · 配置
-    </button>
+    </UiControl>
   );
 }
 

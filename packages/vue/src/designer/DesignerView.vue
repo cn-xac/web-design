@@ -279,16 +279,16 @@ function backToList(): void {
   <component :is="providerComponent">
   <div v-if="ready" class="designer">
     <header class="topbar">
-      <button class="icon-btn" title="返回页面列表" @click="backToList">←</button>
-      <input v-model="title" class="title-input" placeholder="页面标题" />
+      <UiControl as="Button" class="icon-btn" title="返回页面列表" @click="backToList">←</UiControl>
+      <UiControl as="Input" v-model="title" class="title-input" placeholder="页面标题" />
       <span v-if="store.dirty" class="dirty" title="有未保存的修改">●</span>
 
       <UiControl as="Segmented" v-model="device" size="small" class="device" :options="deviceOptions" />
 
       <div class="divider" />
 
-      <button class="icon-btn" title="撤销 (Ctrl+Z)" :disabled="!store.canUndo" @click="store.undo()">↶</button>
-      <button class="icon-btn" title="重做 (Ctrl+Shift+Z)" :disabled="!store.canRedo" @click="store.redo()">↷</button>
+      <UiControl as="Button" class="icon-btn" title="撤销 (Ctrl+Z)" :disabled="!store.canUndo" @click="store.undo()">↶</UiControl>
+      <UiControl as="Button" class="icon-btn" title="重做 (Ctrl+Shift+Z)" :disabled="!store.canRedo" @click="store.redo()">↷</UiControl>
 
       <span class="stat">{{ store.nodeCount }} 个节点</span>
 

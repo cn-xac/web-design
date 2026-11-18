@@ -97,7 +97,7 @@ function argsText(action: ActionSchema): string {
             style="width: 100%"
             @update:model-value="(v: string) => changeAction(event.name, index, v)"
           />
-          <button class="events__del" title="删除" @click="removeAction(event.name, index)">×</button>
+          <UiControl as="Button" class="events__del" title="删除" @click="removeAction(event.name, index)">×</UiControl>
         </div>
         <UiControl as="Input"
           type="textarea"

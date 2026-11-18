@@ -14,6 +14,7 @@ import { useDesignerStore } from "../store";
 import { useMaterialCatalog } from "../../materials/catalog";
 import { useBindingPicker } from "../dialogs";
 import ModalShell from "../ui/ModalShell.vue";
+import UiControl from "../ui/UiControl.vue";
 
 const store = useDesignerStore();
 const catalog = useMaterialCatalog();
@@ -62,10 +63,11 @@ function unbind(): void {
     @close="picker.close()"
   >
     <div class="picker">
-      <input
+      <UiControl
+        as="Input"
         v-model="picker.keyword.value"
         class="picker__search"
-        type="search"
+        type="text"
         placeholder="搜索名称或路径，如 姓名 / form.name"
         spellcheck="false"
       />
@@ -77,10 +79,10 @@ function unbind(): void {
       <div v-else class="picker__list wb-scroll">
         <section v-for="group in groups" :key="group.group" class="picker__group">
           <div class="picker__group-name">{{ group.group }}（{{ group.items.length }}）</div>
-          <button
+          <UiControl
             v-for="item in group.items"
             :key="item.path"
-            type="button"
+            as="Button"
             class="picker__item"
             :class="{ 'is-active': item.path === currentPath }"
             @click="pick(item.path)"
@@ -88,22 +90,22 @@ function unbind(): void {
             <span class="picker__item-label">{{ item.label }}</span>
             <span class="picker__item-path">{{ item.path }}</span>
             <span v-if="item.hint" class="picker__item-hint">{{ item.hint }}</span>
-          </button>
+          </UiControl>
         </section>
       </div>
     </div>
 
     <template #footer>
-      <button
+      <UiControl
         v-if="currentPath"
-        type="button"
+        as="Button"
         class="picker__unbind"
         @click="unbind"
       >
         清除绑定（{{ currentPath }}）
-      </button>
+      </UiControl>
       <span class="picker__spacer" />
-      <button type="button" class="picker__cancel" @click="picker.close()">取消</button>
+      <UiControl as="Button" class="picker__cancel" @click="picker.close()">取消</UiControl>
     </template>
   </ModalShell>
 </template>

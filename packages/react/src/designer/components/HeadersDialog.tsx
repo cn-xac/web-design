@@ -10,6 +10,7 @@
 import { useState } from "react";
 import type { HeaderRow } from "../dialogs";
 import { ModalShell } from "./ModalShell";
+import { UiControl } from "../ui";
 
 export interface HeadersDialogProps {
   initial: HeaderRow[];
@@ -35,12 +36,12 @@ export function HeadersDialog({ initial, onCancel, onConfirm }: HeadersDialogPro
       onClose={onCancel}
       footer={
         <>
-          <button type="button" className="hdr__cancel" onClick={onCancel}>
+          <UiControl as="Button" className="hdr__cancel" onClick={onCancel}>
             取消
-          </button>
-          <button type="button" className="hdr__ok" onClick={() => onConfirm(rows)}>
+          </UiControl>
+          <UiControl as="Button" type="primary" className="hdr__ok" onClick={() => onConfirm(rows)}>
             确定
-          </button>
+          </UiControl>
         </>
       }
     >
@@ -49,31 +50,33 @@ export function HeadersDialog({ initial, onCancel, onConfirm }: HeadersDialogPro
       <div className="hdr__rows">
         {rows.map((row, index) => (
           <div className="hdr__row" key={index}>
-            <input
+            <UiControl
+              as="Input"
               className="hdr__input wb-mono"
               value={row.key}
               placeholder="名称，如 Authorization"
               spellCheck={false}
-              onChange={(event) => patch(index, { key: event.target.value })}
+              onChange={(value: string) => patch(index, { key: value })}
             />
-            <input
+            <UiControl
+              as="Input"
               className="hdr__input wb-mono"
               value={row.value}
               placeholder="取值"
               spellCheck={false}
-              onChange={(event) => patch(index, { value: event.target.value })}
+              onChange={(value: string) => patch(index, { value })}
             />
-            <button type="button" className="hdr__del" title="删除" onClick={() => remove(index)}>
+            <UiControl as="Button" className="hdr__del" title="删除" onClick={() => remove(index)}>
               ×
-            </button>
+            </UiControl>
           </div>
         ))}
         {!rows.length ? <div className="hdr__empty">还没有请求头</div> : null}
       </div>
 
-      <button type="button" className="hdr__add" onClick={add}>
+      <UiControl as="Button" className="hdr__add" onClick={add}>
         + 添加请求头
-      </button>
+      </UiControl>
     </ModalShell>
   );
 }

@@ -17,6 +17,7 @@ import {
 import { useDesigner } from "../context";
 import type { BindingTarget } from "../dialogs";
 import { ModalShell } from "./ModalShell";
+import { UiControl } from "../ui";
 
 export interface BindingPickerDialogProps {
   target: BindingTarget;
@@ -57,25 +58,26 @@ export function BindingPickerDialog({ target, onClose }: BindingPickerDialogProp
       footer={
         <>
           {currentPath ? (
-            <button type="button" className="picker__unbind" onClick={unbind}>
+            <UiControl as="Button" className="picker__unbind" onClick={unbind}>
               清除绑定（{currentPath}）
-            </button>
+            </UiControl>
           ) : null}
           <span className="picker__spacer" />
-          <button type="button" className="picker__cancel" onClick={onClose}>
+          <UiControl as="Button" className="picker__cancel" onClick={onClose}>
             取消
-          </button>
+          </UiControl>
         </>
       }
     >
       <div className="picker">
-        <input
+        <UiControl
+          as="Input"
           className="picker__search"
-          type="search"
+          type="text"
           value={keyword}
           placeholder="搜索名称或路径，如 姓名 / form.name"
           spellCheck={false}
-          onChange={(event) => setKeyword(event.target.value)}
+          onChange={(value: string) => setKeyword(value)}
         />
 
         {!grouped.length ? (
@@ -90,8 +92,8 @@ export function BindingPickerDialog({ target, onClose }: BindingPickerDialogProp
                   {group.group}（{group.items.length}）
                 </div>
                 {group.items.map((item) => (
-                  <button
-                    type="button"
+                  <UiControl
+                    as="Button"
                     key={item.path}
                     className={`picker__item${item.path === currentPath ? " is-active" : ""}`}
                     onClick={() => pick(item.path)}
@@ -99,7 +101,7 @@ export function BindingPickerDialog({ target, onClose }: BindingPickerDialogProp
                     <span className="picker__item-label">{item.label}</span>
                     <span className="picker__item-path">{item.path}</span>
                     {item.hint ? <span className="picker__item-hint">{item.hint}</span> : null}
-                  </button>
+                  </UiControl>
                 ))}
               </section>
             ))}

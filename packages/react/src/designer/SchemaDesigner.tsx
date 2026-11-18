@@ -287,14 +287,15 @@ export const SchemaDesigner = forwardRef<SchemaDesignerHandle, SchemaDesignerPro
       <DesignerDialogsProvider>
         <div className="designer">
           <header className="topbar">
-            <button className="icon-btn" title="返回页面列表" onClick={backToList}>
+            <UiControl as="Button" className="icon-btn" title="返回页面列表" onClick={backToList}>
               ←
-            </button>
-            <input
+            </UiControl>
+            <UiControl
+              as="Input"
               className="title-input"
               placeholder="页面标题"
               value={String(state.page.meta?.title ?? "")}
-              onChange={(event) => store.setTitle(event.target.value)}
+              onChange={(value: string) => store.setTitle(value)}
             />
             {state.dirty ? (
               <span className="dirty" title="有未保存的修改">
@@ -313,17 +314,18 @@ export const SchemaDesigner = forwardRef<SchemaDesignerHandle, SchemaDesignerPro
 
             <div className="divider" />
 
-            <button className="icon-btn" title="撤销 (Ctrl+Z)" disabled={!state.canUndo} onClick={() => store.undo()}>
+            <UiControl as="Button" className="icon-btn" title="撤销 (Ctrl+Z)" disabled={!state.canUndo} onClick={() => store.undo()}>
               ↶
-            </button>
-            <button
+            </UiControl>
+            <UiControl
+              as="Button"
               className="icon-btn"
               title="重做 (Ctrl+Shift+Z)"
               disabled={!state.canRedo}
               onClick={() => store.redo()}
             >
               ↷
-            </button>
+            </UiControl>
 
             <span className="stat">{state.nodeCount} 个节点</span>
             <div className="spacer" />

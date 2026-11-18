@@ -11,6 +11,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import { collectSpecialSettings, getBreadcrumb, type SpecialSettingItem } from "@x-ac/web-design-core";
 import { useDesignerStore } from "../store";
 import OutlineTree from "./OutlineTree.vue";
+import UiControl from "../ui/UiControl.vue";
 
 const store = useDesignerStore();
 
@@ -69,23 +70,23 @@ function selectSetting(item: SpecialSettingItem): void {
   <aside class="opanel">
     <div class="opanel__head">
       <div class="opanel__tabs">
-        <button
-          type="button"
+        <UiControl as="Button"
+         
           class="opanel__tab"
           :class="{ 'is-on': tab === 'tree' }"
           @click="tab = 'tree'"
         >
           组件树
-        </button>
-        <button
-          type="button"
+        </UiControl>
+        <UiControl as="Button"
+         
           class="opanel__tab"
           :class="{ 'is-on': tab === 'settings' }"
           @click="tab = 'settings'"
         >
           特殊设置
           <span v-if="settings.length" class="opanel__tab-count">{{ settings.length }}</span>
-        </button>
+        </UiControl>
       </div>
     </div>
 

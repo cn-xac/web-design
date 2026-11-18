@@ -72,7 +72,7 @@ const tabEvents = computed(() => selectedMaterial.value?.events ?? []);
         {{ breadcrumbText }}
       </div>
       <div class="inspector__tabs">
-        <button
+        <UiControl as="Button"
           v-for="item in visibleTabs"
           :key="item.key"
           class="inspector__tab"
@@ -82,7 +82,7 @@ const tabEvents = computed(() => selectedMaterial.value?.events ?? []);
           {{ item.label }}
           <span v-if="item.key === 'rules' && ruleCount" class="inspector__count">{{ ruleCount }}</span>
           <span v-else-if="item.key === 'events' && tabEvents.length" class="inspector__count">{{ tabEvents.length }}</span>
-        </button>
+        </UiControl>
       </div>
 
       <div class="inspector__body wb-scroll">
@@ -103,7 +103,7 @@ const tabEvents = computed(() => selectedMaterial.value?.events ?? []);
 
     <template v-else>
       <div class="inspector__tabs">
-        <button
+        <UiControl as="Button"
           v-for="item in PAGE_TABS"
           :key="item.key"
           class="inspector__tab"
@@ -111,7 +111,7 @@ const tabEvents = computed(() => selectedMaterial.value?.events ?? []);
           @click="pageTab = item.key"
         >
           {{ item.label }}
-        </button>
+        </UiControl>
       </div>
       <div class="inspector__body wb-scroll">
         <PageSettings v-if="pageTab === 'settings'" />

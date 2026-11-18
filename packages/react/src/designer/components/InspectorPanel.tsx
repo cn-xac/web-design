@@ -74,8 +74,7 @@ export function InspectorPanel() {
           </div>
           <div className="inspector__tabs">
             {visibleTabs.map((item) => (
-              <button
-                type="button"
+              <UiControl as="Button"
                 key={item.key}
                 className={`inspector__tab${nodeTab === item.key ? " is-active" : ""}`}
                 onClick={() => setNodeTab(item.key)}
@@ -86,7 +85,7 @@ export function InspectorPanel() {
                 ) : item.key === "events" && tabEvents.length ? (
                   <span className="inspector__count">{tabEvents.length}</span>
                 ) : null}
-              </button>
+              </UiControl>
             ))}
           </div>
 
@@ -129,14 +128,13 @@ export function InspectorPanel() {
         <>
           <div className="inspector__tabs">
             {PAGE_TABS.map((item) => (
-              <button
-                type="button"
+              <UiControl as="Button"
                 key={item.key}
                 className={`inspector__tab${pageTab === item.key ? " is-active" : ""}`}
                 onClick={() => setPageTab(item.key)}
               >
                 {item.label}
-              </button>
+              </UiControl>
             ))}
           </div>
           <div className="inspector__body wb-scroll">

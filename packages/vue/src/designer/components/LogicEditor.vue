@@ -64,14 +64,14 @@ function directiveValue(name: "show" | "if" | "for"): string {
     <div class="style__section">高级计算（数据计算）</div>
     <div class="style__row style__row--block">
       <label>高级计算</label>
-      <button
-        type="button"
+      <UiControl as="Button"
+       
         class="style__cond-btn style__calc-btn"
         :disabled="!canCalculate"
         @click="openCalculation"
       >
         {{ calculationSummary }} · 配置高级计算
-      </button>
+      </UiControl>
       <div class="style__tip">
         {{ canCalculate ? "结果自动填入当前元素；支持高级函数与子表单聚合" : "仅文字 / 数字元素可配置高级计算" }}
       </div>
@@ -80,9 +80,9 @@ function directiveValue(name: "show" | "if" | "for"): string {
     <div class="style__section">显示 / 隐藏条件</div>
     <div class="style__row style__row--block">
       <label>条件显隐</label>
-      <button type="button" class="style__cond-btn" @click="openConditions()">
+      <UiControl as="Button" class="style__cond-btn" @click="openConditions()">
         {{ conditionSummary() }} · 配置
-      </button>
+      </UiControl>
       <div class="style__tip">一组条件 + 命中动作，未命中取反，无中间态</div>
     </div>
 

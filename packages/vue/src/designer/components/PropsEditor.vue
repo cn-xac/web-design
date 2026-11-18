@@ -185,8 +185,8 @@ function copyId(): void {
     <div class="props__head">
       <span class="props__chip">{{ material.title }}</span>
       <span class="props__id" :title="node?.id" @click="copyId">{{ node?.id }}</span>
-      <button
-        type="button"
+      <UiControl as="Button"
+       
         class="props__ext"
         :class="{ 'is-on': hasExternal, 'is-disabled': !canAttachExternal }"
         :aria-disabled="!canAttachExternal"
@@ -194,22 +194,22 @@ function copyId(): void {
         @click="openExternal"
       >
         外部数据源{{ hasExternal ? " ●" : "" }}
-      </button>
+      </UiControl>
     </div>
 
     <div v-if="material.hint" class="props__hint">{{ material.hint }}</div>
 
     <section v-for="section in sections" :key="section.group" class="props__group">
-      <button
+      <UiControl as="Button"
         class="props__group-head"
         :class="{ 'is-collapsed': collapsed[section.group] }"
-        type="button"
+       
         @click="toggle(section.group)"
       >
         <span class="props__group-arrow">▾</span>
         <span class="props__group-name">{{ FIELD_GROUP_LABELS[section.group] }}</span>
         <span class="props__group-count">{{ section.fields.length }}</span>
-      </button>
+      </UiControl>
 
       <div v-show="!collapsed[section.group]" class="props__group-body">
         <div v-for="field in section.fields" :key="field.key" class="props__row">
@@ -217,14 +217,14 @@ function copyId(): void {
             <span>{{ field.label }}</span>
             <span v-if="isCustom(field.key)" class="props__dot" title="与默认值不同，会写入 Schema">●</span>
             <span v-if="isBound(value(field.key))" class="props__bind">绑定</span>
-            <button
-              type="button"
+            <UiControl as="Button"
+             
               class="props__link"
               :title="`把「${field.label}」绑定到页面数据`"
               @click="openBinding(field.key, field.label)"
             >
               🔗
-            </button>
+            </UiControl>
           </div>
 
           <!-- 适配包覆盖优先：给了就用它的控件，没给走下面的内置实现 -->
@@ -291,10 +291,10 @@ function copyId(): void {
 
           <!-- 名称/值成对的选项：走独立弹窗录入（rSulo9） -->
           <div v-else-if="field.type === 'optionPair'" class="props__options">
-            <button type="button" class="props__options-btn" @click="openOptions(field.key, field.label)">
+            <UiControl as="Button" class="props__options-btn" @click="openOptions(field.key, field.label)">
               <span class="props__options-text">{{ optionsSummary(field.key).text }}</span>
               <span class="props__options-edit">编辑…</span>
-            </button>
+            </UiControl>
           </div>
 
           <template v-if="field.type === 'columns'">
@@ -312,7 +312,7 @@ function copyId(): void {
                   placeholder="字段"
                   @update:model-value="(v: unknown) => updateColumn(field.key, index, 'prop', String(v))"
                 />
-                <button class="columns__del" title="删除该列" @click="removeColumn(field.key, index)">×</button>
+                <UiControl as="Button" class="columns__del" title="删除该列" @click="removeColumn(field.key, index)">×</UiControl>
               </div>
               <UiControl as="Button" size="small" text type="primary" @click="addColumn(field.key)">+ 添加列</UiControl>
             </div>

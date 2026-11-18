@@ -207,14 +207,13 @@ export function PropsEditor() {
               placeholder="字段"
               onChange={(v: unknown) => updateColumn(field.key, index, "key", String(v))}
             />
-            <button
-              type="button"
+            <UiControl as="Button"
               className="columns__del"
               title="删除该列"
               onClick={() => removeColumn(field.key, index)}
             >
               ×
-            </button>
+            </UiControl>
           </div>
         ))}
         <UiControl as="Button" size="small" type="primary" onClick={() => addColumn(field.key)}>
@@ -293,14 +292,13 @@ export function PropsEditor() {
       case "optionPair":
         return (
           <div className="props__options">
-            <button
-              type="button"
+            <UiControl as="Button"
               className="props__options-btn"
               onClick={() => dialogs.openOptions({ nodeId, key: field.key, label: field.label })}
             >
               <span className="props__options-text">{optionsSummary(field.key).text}</span>
               <span className="props__options-edit">编辑…</span>
-            </button>
+            </UiControl>
           </div>
         );
       case "text":
@@ -327,30 +325,28 @@ export function PropsEditor() {
         <span className="props__id" title={nodeId} onClick={copyId}>
           {nodeId}
         </span>
-        <button
-          type="button"
+        <UiControl as="Button"
           className={`props__ext${hasExternal ? " is-on" : ""}${canAttachExternal ? "" : " is-disabled"}`}
           aria-disabled={!canAttachExternal}
           title={externalTitle}
           onClick={openExternal}
         >
           外部数据源{hasExternal ? " ●" : ""}
-        </button>
+        </UiControl>
       </div>
 
       {material.hint ? <div className="props__hint">{material.hint}</div> : null}
 
       {sections.map((section) => (
         <section className="props__group" key={section.group}>
-          <button
-            type="button"
+          <UiControl as="Button"
             className={`props__group-head${collapsed[section.group] ? " is-collapsed" : ""}`}
             onClick={() => toggle(section.group)}
           >
             <span className="props__group-arrow">▾</span>
             <span className="props__group-name">{FIELD_GROUP_LABELS[section.group]}</span>
             <span className="props__group-count">{section.fields.length}</span>
-          </button>
+          </UiControl>
           {/* 对齐 Vue 的 v-show：折叠只隐藏，不卸载已输入的内容 */}
           <div
             className="props__group-body"
@@ -367,8 +363,7 @@ export function PropsEditor() {
                   ) : null}
                   {isBound(value(field.key)) ? <span className="props__bind">绑定</span> : null}
                   {/* 绑定入口：点开是「可绑定数据」清单弹窗（ruUqAF） */}
-                  <button
-                    type="button"
+                  <UiControl as="Button"
                     className="props__link"
                     title={`把「${field.label}」绑定到页面数据`}
                     onClick={() =>
@@ -381,7 +376,7 @@ export function PropsEditor() {
                     }
                   >
                     🔗
-                  </button>
+                  </UiControl>
                 </div>
 
                 {renderControl(field)}

@@ -138,7 +138,7 @@ function preview(rule: ValidationRule): string {
           @update:model-value="(value: unknown) => changeType(index, value as RuleType)"
         />
 
-        <button class="rule__del" title="删除该规则" @click="remove(index)">×</button>
+        <UiControl as="Button" class="rule__del" title="删除该规则" @click="remove(index)">×</UiControl>
       </div>
 
       <div v-if="getRuleDefinition(rule.type)?.valueKind === 'number' || getRuleDefinition(rule.type)?.valueKind === 'length'" class="rule__value">

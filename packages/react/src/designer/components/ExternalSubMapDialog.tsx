@@ -15,6 +15,7 @@ import { useDesigner } from "../context";
 import type { SubMapTarget } from "../dialogs";
 import { HelpTip } from "./HelpTip";
 import { ModalShell } from "./ModalShell";
+import { UiControl } from "../ui";
 
 /** 问号图标上的悬浮说明 */
 const SUB_MAP_TIP = [
@@ -66,12 +67,12 @@ export function ExternalSubMapDialog({ target, onCancel, onConfirm }: ExternalSu
       footer={
         <>
           <span className="sub__spacer" />
-          <button type="button" className="sub__cancel" onClick={onCancel}>
+          <UiControl as="Button" className="sub__cancel" onClick={onCancel}>
             取消
-          </button>
-          <button type="button" className="sub__ok" onClick={save}>
+          </UiControl>
+          <UiControl as="Button" type="primary" className="sub__ok" onClick={save}>
             确定
-          </button>
+          </UiControl>
         </>
       }
     >
@@ -100,12 +101,13 @@ export function ExternalSubMapDialog({ target, onCancel, onConfirm }: ExternalSu
                 <span className="sub__label">{row.label}</span>
                 <code className="sub__code">{row.field}</code>
               </div>
-              <input
+              <UiControl
+                as="Input"
                 className="sub__input wb-mono"
                 value={row.from}
                 placeholder="如 goodsName（留空 = 不映射）"
                 spellCheck={false}
-                onChange={(event) => patch(index, event.target.value)}
+                onChange={(value: string) => patch(index, value)}
               />
             </div>
           ))}

@@ -6,7 +6,7 @@
  * 这样 react-* 扩展仓实现一个控件时不必关心引擎内部状态怎么存。
  */
 import { createElement } from "react";
-import type { ChangeEvent, ComponentType, ReactNode } from "react";
+import type { ChangeEvent, ComponentType, MouseEvent, ReactNode } from "react";
 import { DESIGNER_SLOTS } from "@x-ac/web-design-core";
 import type { DesignerKit, DesignerSlot, UiAdapter } from "@x-ac/web-design-core";
 import type { ReactMaterial } from "../adapter";
@@ -41,7 +41,7 @@ export interface DesignerControlProps {
   controls?: boolean;
   showAlpha?: boolean;
   className?: string;
-  onClick?: () => void;
+  onClick?: (event: MouseEvent<HTMLElement>) => void;
   children?: ReactNode;
   plain?: boolean;
   /** 原生 title / spellCheck：设计器控件常需要提示文案与关闭拼写检查 */
@@ -67,7 +67,7 @@ function NativeButton(props: DesignerControlProps) {
       type="button"
       disabled={disabled}
       title={title}
-      onClick={onClick}
+      onClick={(event) => onClick?.(event)}
       onMouseEnter={onMouseEnter}
       onFocus={onFocus}
       className={`wbd-btn wbd-btn--${type}${size === "small" ? " wbd-sm" : ""} ${className}`.trim()}

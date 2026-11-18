@@ -12,6 +12,7 @@ import {
 } from "@x-ac/web-design-core";
 import { createPortal } from "react-dom";
 import { ModalShell } from "./ModalShell";
+import { UiControl } from "../ui";
 
 export interface CalculationHelpDialogProps {
   onClose: () => void;
@@ -24,9 +25,9 @@ export function CalculationHelpDialog({ onClose }: CalculationHelpDialogProps) {
 
   return createPortal(
     <ModalShell title="高级函数使用说明" width="860px" onClose={onClose} footer={<>
-      <button type="button" className="calc__help-close" onClick={onClose}>
+      <UiControl as="Button" className="calc__help-close" onClick={onClose}>
         关闭
-      </button>
+      </UiControl>
     </>}>
       <div className="calc__help">
         <p className="calc__help-intro">

@@ -14,6 +14,7 @@ import {
   calculationFunctionGroups,
 } from "@x-ac/web-design-core";
 import ModalShell from "../ui/ModalShell.vue";
+import UiControl from "../ui/UiControl.vue";
 
 const emit = defineEmits<{ close: [] }>();
 const groups = calculationFunctionGroups();
@@ -92,7 +93,7 @@ const groups = calculationFunctionGroups();
       </div>
 
       <template #footer>
-        <button type="button" class="calc__help-close" @click="emit('close')">关闭</button>
+        <UiControl as="Button" class="calc__help-close" @click="emit('close')">关闭</UiControl>
       </template>
     </ModalShell>
   </Teleport>

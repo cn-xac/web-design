@@ -16,6 +16,7 @@ import { useDesignerStore } from "../store";
 import { useMaterialCatalog } from "../../materials/catalog";
 import { useSubMapDialog } from "../dialogs";
 import ModalShell from "../ui/ModalShell.vue";
+import UiControl from "../ui/UiControl.vue";
 import HelpTip from "../ui/HelpTip.vue";
 
 const store = useDesignerStore();
@@ -96,7 +97,8 @@ function save(): void {
             <span class="sub__label">{{ row.label }}</span>
             <code class="sub__code">{{ row.field }}</code>
           </div>
-          <input
+          <UiControl
+            as="Input"
             v-model="rows[index].from"
             class="sub__input wb-mono"
             placeholder="如 goodsName（留空 = 不映射）"
@@ -111,8 +113,8 @@ function save(): void {
 
     <template #footer>
       <span class="sub__spacer" />
-      <button type="button" class="sub__cancel" @click="dialog.cancel()">取消</button>
-      <button type="button" class="sub__ok" @click="save">确定</button>
+      <UiControl as="Button" class="sub__cancel" @click="dialog.cancel()">取消</UiControl>
+      <UiControl as="Button" type="primary" class="sub__ok" @click="save">确定</UiControl>
     </template>
   </ModalShell>
 </template>

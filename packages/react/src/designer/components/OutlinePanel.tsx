@@ -8,6 +8,7 @@ import {
   type SpecialSettingItem,
 } from "@x-ac/web-design-core";
 import { useDesigner } from "../context";
+import { UiControl } from "../ui";
 
 interface OutlineTreeProps {
   nodes: NodeSchema[];
@@ -135,8 +136,7 @@ function OutlineTree({ nodes, depth, expanded, onToggle }: OutlineTreeProps) {
               </span>
               {kids ? <span className="otree__count">{children.length}</span> : null}
               <span className="otree__acts">
-                <button
-                  type="button"
+                <UiControl as="Button"
                   className="otree__act"
                   title="复制"
                   onClick={(event) => {
@@ -145,9 +145,8 @@ function OutlineTree({ nodes, depth, expanded, onToggle }: OutlineTreeProps) {
                   }}
                 >
                   ⧉
-                </button>
-                <button
-                  type="button"
+                </UiControl>
+                <UiControl as="Button"
                   className="otree__act"
                   title="删除"
                   onClick={(event) => {
@@ -156,7 +155,7 @@ function OutlineTree({ nodes, depth, expanded, onToggle }: OutlineTreeProps) {
                   }}
                 >
                   ✕
-                </button>
+                </UiControl>
               </span>
             </div>
             {kids && expanded.has(node.id) ? (
@@ -236,21 +235,19 @@ export function OutlinePanel() {
     <aside className="opanel">
       <div className="opanel__head">
         <div className="opanel__tabs">
-          <button
-            type="button"
+          <UiControl as="Button"
             className={`opanel__tab${tab === "tree" ? " is-on" : ""}`}
             onClick={() => setTab("tree")}
           >
             组件树
-          </button>
-          <button
-            type="button"
+          </UiControl>
+          <UiControl as="Button"
             className={`opanel__tab${tab === "settings" ? " is-on" : ""}`}
             onClick={() => setTab("settings")}
           >
             特殊设置
             {settings.length ? <span className="opanel__tab-count">{settings.length}</span> : null}
-          </button>
+          </UiControl>
         </div>
       </div>
 

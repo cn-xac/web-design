@@ -11,6 +11,7 @@ import type { NodeSchema } from "@x-ac/web-design-core";
 import { elementLabelOf } from "@x-ac/web-design-core";
 import { useMaterialCatalog } from "../../materials/catalog";
 import { useDesignerStore } from "../store";
+import UiControl from "../ui/UiControl.vue";
 
 const props = defineProps<{
   nodes: NodeSchema[];
@@ -142,8 +143,8 @@ function onDrop(event: DragEvent, node: NodeSchema): void {
         <span class="otree__name" :title="labelOf(node)">{{ labelOf(node) }}</span>
         <span v-if="hasChildren(node)" class="otree__count">{{ node.children!.length }}</span>
         <span class="otree__acts">
-          <button class="otree__act" title="复制" @click.stop="copyRow(node)">⧉</button>
-          <button class="otree__act" title="删除" @click.stop="removeRow(node)">✕</button>
+          <UiControl as="Button" class="otree__act" title="复制" @click.stop="copyRow(node)">⧉</UiControl>
+          <UiControl as="Button" class="otree__act" title="删除" @click.stop="removeRow(node)">✕</UiControl>
         </span>
       </div>
 
