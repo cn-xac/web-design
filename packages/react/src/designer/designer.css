@@ -1662,10 +1662,6 @@ select.wbd-input.wbd-sm {
 .props__ext.is-disabled { color: var(--wb-ink4, #a8b0be); border-style: dashed; background: #fbfcfe; }
 /* 高级计算入口：与「外部数据源」并列的弱禁用按钮 */
 .props__head { flex-wrap: wrap; }
-.props__calc { border: 1px solid var(--wb-line); border-radius: 4px; background: #fff; padding: 2px 7px; font-size: 11px; font-family: inherit; color: var(--wb-ink2); cursor: pointer; white-space: nowrap; }
-.props__calc:hover { border-color: var(--wb-primary); color: var(--wb-primary); }
-.props__calc.is-on { border-color: var(--wb-primary); background: var(--wb-primary-soft); color: var(--wb-primary); }
-.props__calc.is-disabled { color: var(--wb-ink4, #a8b0be); border-style: dashed; background: #fbfcfe; }
 .props__options { width: 100%; }
 .props__options-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; border: 1px solid var(--wb-line); border-radius: 5px; background: #fff; font-family: inherit; text-align: left; cursor: pointer; }
 .props__options-btn:hover { border-color: var(--wb-primary); }

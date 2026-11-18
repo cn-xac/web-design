@@ -448,7 +448,7 @@ describe("React 设计器：显示隐藏条件弹窗", () => {
       await ui.render();
       await ui.select("i1");
 
-      await click(byText(ui.container, ".inspector__tab", "样式"));
+      await click(byText(ui.container, ".inspector__tab", "逻辑"));
       // 1.3.0 起条件只有一个入口（排除「数据计算」入口）
       const trigger = byText(ui.container, ".style__cond-btn:not(.style__calc-btn)", "未配置");
       expect(trigger).toBeTruthy();
@@ -485,7 +485,7 @@ describe("React 设计器：显示隐藏条件弹窗", () => {
       await ui.render();
       await ui.select("i1");
 
-      await click(byText(ui.container, ".inspector__tab", "样式"));
+      await click(byText(ui.container, ".inspector__tab", "逻辑"));
       await click(byText(ui.container, ".style__cond-btn:not(.style__calc-btn)", "未配置"));
       await click(byText(ui.container, ".cond__mode", "命中时隐藏"));
 
@@ -525,7 +525,7 @@ describe("React 设计器：右值按左元素类型渲染（rVDILq）", () => {
     const ui = setup(pageWith([target, ...optionsElements]));
     await ui.render();
     await ui.select("i1");
-    await click(byText(ui.container, ".inspector__tab", "样式"));
+    await click(byText(ui.container, ".inspector__tab", "逻辑"));
     // 已有 visibility 时按钮摘要不是「未配置」，直接按选择器点
     await click(ui.container.querySelector(".style__cond-btn:not(.style__calc-btn)"));
     return ui;

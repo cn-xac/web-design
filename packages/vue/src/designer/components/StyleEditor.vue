@@ -11,47 +11,11 @@ import {
   type SpacingKey,
   type SpacingSide,
 } from "@x-ac/web-design-core";
-import { CONDITION_MODE_OPTIONS, canOwnCalculation } from "@x-ac/web-design-core";
 import { useDesignerStore } from "../store";
-import { useCalculationDialog, useConditionDialog } from "../dialogs";
 import UiControl from "../ui/UiControl.vue";
 
 const store = useDesignerStore();
 const node = computed(() => store.selectedNode);
-const conditionDialog = useConditionDialog();
-const calculationDialog = useCalculationDialog();
-
-/** 仅文字 / 数字元素可配置数据计算（rtHicl） */
-const canCalculate = computed(() => (node.value ? canOwnCalculation(node.value) : false));
-const calculationSummary = computed(() => {
-  const config = node.value?.calculation;
-  return config ? `${config.operands.length} 个元素 · ${config.formula}` : "未配置";
-});
-
-function openCalculation(): void {
-  if (!node.value || !canCalculate.value) return;
-  calculationDialog.open({
-    nodeId: node.value.id,
-    label: String(node.value.props?.label ?? node.value.component),
-  });
-}
-
-/** 条件摘要：让属性面板在不打开弹窗时也能看出配置状态 */
-function conditionSummary(): string {
-  const group = node.value?.visibility?.when;
-  if (!group?.rows.length) return "未配置";
-  const mode = CONDITION_MODE_OPTIONS.find((option) => option.value === group.mode)?.label ?? group.mode;
-  const action = node.value?.visibility?.action ?? "show";
-  return `${group.rows.length} 条 · ${mode} · ${action === "hide" ? "命中隐藏" : "命中显示"}`;
-}
-
-function openConditions(): void {
-  if (!node.value) return;
-  conditionDialog.open({
-    nodeId: node.value.id,
-    label: String(node.value.props?.label ?? node.value.component),
-  });
-}
 
 interface StyleField {
   key: string;
@@ -69,12 +33,6 @@ const STYLE_FIELDS: StyleField[] = [
   { key: "fontSize", label: "字号", type: "text", placeholder: "如 14px" },
   { key: "textAlign", label: "对齐", type: "select", options: ["left", "center", "right"] },
   { key: "borderRadius", label: "圆角", type: "text", placeholder: "如 8px" },
-];
-
-const DIRECTIVES: Array<{ name: "show" | "if" | "for"; label: string; tip: string; placeholder: string }> = [
-  { name: "show", label: "显示条件", tip: "不满足时渲染但隐藏，如 list.length > 0", placeholder: "list.length > 0" },
-  { name: "if", label: "渲染条件", tip: "不满足时完全不渲染，适合有明显副作用的组件", placeholder: "form.type === 'a'" },
-  { name: "for", label: "循环数据", tip: "绑定数组，子组件内用 item / index 访问", placeholder: "{{list}}" },
 ];
 
 const SIDE_LABEL: Record<SpacingSide, string> = { top: "上", right: "右", bottom: "下", left: "左" };
@@ -157,10 +115,6 @@ function applyPreset(key: SpacingKey, px: number, scope: "all" | "v" | "h" = "al
 function styleValue(key: string): string {
   const value = node.value?.style?.[key];
   return value === undefined || value === null ? "" : String(value);
-}
-
-function directiveValue(name: "show" | "if" | "for"): string {
-  return node.value?.directives?.find((item) => item.name === name)?.value ?? "";
 }
 </script>
 
@@ -298,43 +252,6 @@ function directiveValue(name: "show" | "if" | "for"): string {
       />
     </div>
 
-    <div class="style__section">高级计算（数据计算）</div>
-    <div class="style__row style__row--block">
-      <label>高级计算</label>
-      <button
-        type="button"
-        class="style__cond-btn style__calc-btn"
-        :disabled="!canCalculate"
-        @click="openCalculation"
-      >
-        {{ calculationSummary }} · 配置高级计算
-      </button>
-      <div class="style__tip">
-        {{ canCalculate ? "结果自动填入当前元素；支持高级函数与子表单聚合" : "仅文字 / 数字元素可配置高级计算" }}
-      </div>
-    </div>
-
-    <div class="style__section">显示 / 隐藏条件</div>
-    <div class="style__row style__row--block">
-      <label>条件显隐</label>
-      <button type="button" class="style__cond-btn" @click="openConditions()">
-        {{ conditionSummary() }} · 配置
-      </button>
-      <div class="style__tip">一组条件 + 命中动作，未命中取反，无中间态</div>
-    </div>
-
-    <div class="style__section">显示与循环（旧指令）</div>
-    <div v-for="directive in DIRECTIVES" :key="directive.name" class="style__row style__row--block">
-      <label>{{ directive.label }}</label>
-      <UiControl as="Input"
-        size="small"
-        :model-value="directiveValue(directive.name)"
-        :placeholder="directive.placeholder"
-        @update:model-value="(v: string) => store.setDirective(directive.name, v)"
-      />
-      <div class="style__tip">{{ directive.tip }}</div>
-    </div>
-
     <div class="style__section">预览元素</div>
     <pre class="style__preview">{{ JSON.stringify({ style: node.style ?? {}, visibility: node.visibility ?? {}, directives: node.directives ?? [] }, null, 2) }}</pre>
   </div>
@@ -343,22 +260,6 @@ function directiveValue(name: "show" | "if" | "for"): string {
 <style scoped>
 .style {
   padding: 14px;
-}
-.style__cond-btn {
-  width: 100%;
-  border: 1px solid var(--wb-line);
-  border-radius: 5px;
-  background: #fff;
-  padding: 5px 8px;
-  font-size: 12px;
-  font-family: inherit;
-  text-align: left;
-  color: var(--wb-ink2);
-  cursor: pointer;
-}
-.style__cond-btn:hover {
-  border-color: var(--wb-primary);
-  color: var(--wb-primary);
 }
 .style__section {
   margin: 16px 0 10px;

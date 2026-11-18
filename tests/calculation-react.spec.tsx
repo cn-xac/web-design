@@ -129,19 +129,20 @@ async function setNativeValue(element: HTMLInputElement | HTMLSelectElement | HT
 }
 
 async function openCalculationDialog(container: HTMLElement) {
-  await click(byText(container, ".inspector__tab", "样式"));
+  await click(byText(container, ".inspector__tab", "逻辑"));
   await click(container.querySelector(".style__calc-btn"));
 }
 
 describe("React 设计器：数据计算弹窗", () => {
-  it("属性面板头部有「高级计算」入口，点击直接打开配置弹窗", async () => {
+  it("逻辑面板有「高级计算」入口，点击直接打开配置弹窗", async () => {
     const ui = setup(
       pageWith([{ id: "f1", component: "text", props: { label: "合计" } }]),
     );
     try {
       await ui.render();
       await ui.select("f1");
-      const entry = ui.container.querySelector(".props__calc");
+      await click(byText(ui.container, ".inspector__tab", "逻辑"));
+      const entry = ui.container.querySelector(".style__calc-btn");
       expect(entry?.textContent).toContain("高级计算");
       await click(entry);
       expect(ui.container.querySelector(".wbd-modal__title")?.textContent).toContain("配置高级计算");

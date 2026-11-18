@@ -1,5 +1,5 @@
 /**
- * 右侧检查器：选中节点时是「属性 / 样式 / 校验 / 事件」四个 Tab，
+ * 右侧检查器：选中节点时是「属性 / 样式 / 逻辑 / 校验 / 事件」五个 Tab，
  * 未选中时是「页面设置 / Schema」两个 Tab（Schema 是整页视图，归页面级）。
  * 与 Vue 版 InspectorPanel.vue 功能对齐。
  */
@@ -9,17 +9,19 @@ import { useDesigner } from "../context";
 import { UiControl } from "../ui";
 import { PropsEditor } from "./PropsEditor";
 import { StyleEditor } from "./StyleEditor";
+import { LogicEditor } from "./LogicEditor";
 import { RulesEditor } from "./RulesEditor";
 import { EventsEditor } from "./EventsEditor";
 import { PageSettings } from "./PageSettings";
 import { SchemaViewer } from "./SchemaViewer";
 
 /** 选中节点时的面板：Schema 不放这里，它看的是整页 */
-type NodeTabKey = "props" | "style" | "rules" | "events";
+type NodeTabKey = "props" | "style" | "logic" | "rules" | "events";
 
 const NODE_TABS: Array<{ key: NodeTabKey; label: string }> = [
   { key: "props", label: "属性" },
   { key: "style", label: "样式" },
+  { key: "logic", label: "逻辑" },
   { key: "rules", label: "校验" },
   { key: "events", label: "事件" },
 ];
@@ -93,6 +95,8 @@ export function InspectorPanel() {
               <PropsEditor />
             ) : nodeTab === "style" ? (
               <StyleEditor />
+            ) : nodeTab === "logic" ? (
+              <LogicEditor />
             ) : nodeTab === "rules" ? (
               <RulesEditor />
             ) : (

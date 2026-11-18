@@ -105,19 +105,21 @@ async function mountDesigner() {
 }
 
 async function openCalculationDialog(wrapper: Awaited<ReturnType<typeof mountDesigner>>["wrapper"]) {
-  const styleTab = wrapper.findAll(".inspector__tab").find((tab) => tab.text().includes("样式"));
-  expect(styleTab).toBeTruthy();
-  await styleTab!.trigger("click");
+  const logicTab = wrapper.findAll(".inspector__tab").find((tab) => tab.text().includes("逻辑"));
+  expect(logicTab).toBeTruthy();
+  await logicTab!.trigger("click");
   await tick();
   await wrapper.find(".style__calc-btn").trigger("click");
   await tick();
 }
 
 describe("Vue 设计器：数据计算弹窗", () => {
-  it("属性面板头部有「高级计算」入口，点击直接打开配置弹窗", async () => {
+  it("逻辑面板有「高级计算」入口，点击直接打开配置弹窗", async () => {
     const { wrapper } = await mountDesigner();
-    // 默认就是「属性」Tab，不需要先切到「样式」
-    const entry = wrapper.find(".props__calc");
+    const logicTab = wrapper.findAll(".inspector__tab").find((tab) => tab.text().includes("逻辑"));
+    await logicTab!.trigger("click");
+    await tick();
+    const entry = wrapper.find(".style__calc-btn");
     expect(entry.exists()).toBe(true);
     expect(entry.text()).toContain("高级计算");
     await entry.trigger("click");
@@ -278,8 +280,8 @@ describe("Vue 设计器：数据计算弹窗", () => {
     store.select("f3");
     await tick();
 
-    const styleTab = wrapper.findAll(".inspector__tab").find((tab) => tab.text().includes("样式"));
-    await styleTab!.trigger("click");
+    const logicTab = wrapper.findAll(".inspector__tab").find((tab) => tab.text().includes("逻辑"));
+    await logicTab!.trigger("click");
     await tick();
     expect((wrapper.find(".style__calc-btn").element as HTMLButtonElement).disabled).toBe(true);
     wrapper.unmount();

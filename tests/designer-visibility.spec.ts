@@ -55,9 +55,9 @@ async function mountWithNodes(target: NodeSchema) {
 
 async function openConditionDialog(wrapper: Awaited<ReturnType<typeof mountWithNodes>>["wrapper"]) {
   const tabs = wrapper.findAll(".inspector__tab");
-  const styleTab = tabs.find((tab) => tab.text().includes("样式"));
-  expect(styleTab).toBeTruthy();
-  await styleTab!.trigger("click");
+  const logicTab = tabs.find((tab) => tab.text().includes("逻辑"));
+  expect(logicTab).toBeTruthy();
+  await logicTab!.trigger("click");
   await tick();
 
   // 1.3.0 起条件只有一个入口（数据计算入口按专属选择器排除）
@@ -142,8 +142,8 @@ describe("设计器：显示 / 隐藏条件弹窗", () => {
     await tick();
 
     const tabs = wrapper.findAll(".inspector__tab");
-    const styleTab = tabs.find((tab) => tab.text().includes("样式"));
-    await styleTab!.trigger("click");
+    const logicTab = tabs.find((tab) => tab.text().includes("逻辑"));
+    await logicTab!.trigger("click");
     await tick();
 
     const summary = wrapper.findAll(".style__cond-btn:not(.style__calc-btn)")[0].text();

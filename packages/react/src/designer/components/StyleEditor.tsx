@@ -14,8 +14,6 @@ import {
 import type { SpacingBox, SpacingKey, SpacingSide } from "@x-ac/web-design-core";
 import { useDesigner } from "../context";
 import { UiControl } from "../ui";
-import { ConditionTrigger } from "./ConditionBuilder";
-import { CalculationTrigger } from "./CalculationTrigger";
 
 interface StyleField {
   key: string;
@@ -33,17 +31,6 @@ const STYLE_FIELDS: StyleField[] = [
   { key: "fontSize", label: "字号", type: "text", placeholder: "如 14px" },
   { key: "textAlign", label: "对齐", type: "select", options: ["left", "center", "right"] },
   { key: "borderRadius", label: "圆角", type: "text", placeholder: "如 8px" },
-];
-
-const DIRECTIVES: Array<{
-  name: "show" | "if" | "for";
-  label: string;
-  tip: string;
-  placeholder: string;
-}> = [
-  { name: "show", label: "显示条件", tip: "不满足时渲染但隐藏，如 list.length > 0", placeholder: "list.length > 0" },
-  { name: "if", label: "渲染条件", tip: "不满足时完全不渲染，适合有明显副作用的组件", placeholder: "form.type === 'a'" },
-  { name: "for", label: "循环数据", tip: "绑定数组，子组件内用 item / index 访问", placeholder: "{{list}}" },
 ];
 
 type SpacingMode = "uniform" | "pair" | "free";
@@ -148,9 +135,6 @@ export function StyleEditor() {
     const value = node.style?.[key];
     return value === undefined || value === null ? "" : String(value);
   };
-
-  const directiveValue = (name: "show" | "if" | "for"): string =>
-    node.directives?.find((item) => item.name === name)?.value ?? "";
 
   return (
     <div className="style">
@@ -307,37 +291,6 @@ export function StyleEditor() {
               onChange={(v: unknown) => store.updateStyle(field.key, String(v ?? ""))}
             />
           )}
-        </div>
-      ))}
-
-      <div className="style__section">高级计算（数据计算）</div>
-      <div className="style__row style__row--block">
-        <label>高级计算</label>
-        <CalculationTrigger />
-        <div className="style__tip">
-          仅文字 / 数字元素可配置高级计算；结果自动填入当前元素，支持高级函数与子表单聚合
-        </div>
-      </div>
-
-      <div className="style__section">显示 / 隐藏条件</div>
-      <div className="style__row style__row--block">
-        <label>条件显隐</label>
-        <ConditionTrigger />
-        <div className="style__tip">一组条件 + 命中动作，未命中取反，无中间态</div>
-      </div>
-
-      <div className="style__section">显示与循环（旧指令）</div>
-      {DIRECTIVES.map((directive) => (
-        <div className="style__row style__row--block" key={directive.name}>
-          <label>{directive.label}</label>
-          <UiControl
-            as="Input"
-            size="small"
-            value={directiveValue(directive.name)}
-            placeholder={directive.placeholder}
-            onChange={(v: unknown) => store.setDirective(directive.name, String(v ?? ""))}
-          />
-          <div className="style__tip">{directive.tip}</div>
         </div>
       ))}
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * 右侧检查器的面板归位：
- * - 选中节点时只有「属性 / 样式 / 校验 / 事件」，Schema 不再挂在节点上；
+ * - 选中节点时只有「属性 / 样式 / 逻辑 / 校验 / 事件」，Schema 不再挂在节点上；
  * - 未选中节点时是「页面设置 / Schema」两个 Tab，Schema 看的是整页。
  *
  * 与 designer-bindings.spec.ts 同一套挂载方式：直接往 store 放 Schema，
@@ -53,7 +53,7 @@ const tabLabels = (wrapper: ReturnType<typeof mount>) =>
   wrapper.findAll(".inspector__tab").map((item) => item.text().replace(/\d+$/, "").trim());
 
 describe("设计器：Schema 归到页面面板", () => {
-  it("选中节点时只有属性/样式/校验/事件，没有 Schema", async () => {
+  it("选中节点时只有属性/样式/逻辑/校验/事件，没有 Schema", async () => {
     const { wrapper, store } = await mountDesigner();
 
     store.setPage({
@@ -63,8 +63,35 @@ describe("设计器：Schema 归到页面面板", () => {
     store.select("i1");
     await tick(40);
 
-    expect(tabLabels(wrapper)).toEqual(["属性", "样式", "校验", "事件"]);
+    expect(tabLabels(wrapper)).toEqual(["属性", "样式", "逻辑", "校验", "事件"]);
     expect(wrapper.find(".schema__code").exists()).toBe(false);
+  });
+
+  it("逻辑入口只在逻辑 tab：样式 tab 不再有条件/计算按钮，属性头部也不再有计算按钮", async () => {
+    const { wrapper, store } = await mountDesigner();
+    store.setPage({
+      ...blankTemplate("面板测试"),
+      children: [{ id: "i1", component: "text", props: { label: "合计" } }],
+    });
+    store.select("i1");
+    await tick(40);
+
+    // 属性 tab：没有头部高级计算按钮
+    expect(wrapper.find(".props__calc").exists()).toBe(false);
+
+    // 样式 tab：没有条件 / 计算入口
+    const styleTab = wrapper.findAll(".inspector__tab").find((tab) => tab.text().includes("样式"));
+    await styleTab!.trigger("click");
+    await tick();
+    expect(wrapper.find(".style__cond-btn").exists()).toBe(false);
+
+    // 逻辑 tab：四个入口都在
+    const logicTab = wrapper.findAll(".inspector__tab").find((tab) => tab.text().includes("逻辑"));
+    await logicTab!.trigger("click");
+    await tick();
+    expect(wrapper.findAll(".style__cond-btn")).toHaveLength(2); // 高级计算 + 条件显隐
+    expect(wrapper.text()).toContain("渲染条件");
+    expect(wrapper.text()).toContain("循环数据");
   });
 
   it("未选中时页面面板是「页面设置 / Schema」两个 Tab，能切到整页 Schema", async () => {

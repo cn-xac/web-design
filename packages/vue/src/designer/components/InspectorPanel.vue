@@ -6,6 +6,7 @@ import { useDesignerStore } from "../store";
 import UiControl from "../ui/UiControl.vue";
 import PropsEditor from "./PropsEditor.vue";
 import StyleEditor from "./StyleEditor.vue";
+import LogicEditor from "./LogicEditor.vue";
 import EventsEditor from "./EventsEditor.vue";
 import SchemaViewer from "./SchemaViewer.vue";
 import RulesEditor from "./RulesEditor.vue";
@@ -15,10 +16,11 @@ const store = useDesignerStore();
 const catalog = useMaterialCatalog();
 
 /** 选中节点时的面板：Schema 是整页视图，归到页面设置，不放这里 */
-type NodeTabKey = "props" | "style" | "rules" | "events";
+type NodeTabKey = "props" | "style" | "logic" | "rules" | "events";
 const NODE_TABS: Array<{ key: NodeTabKey; label: string }> = [
   { key: "props", label: "属性" },
   { key: "style", label: "样式" },
+  { key: "logic", label: "逻辑" },
   { key: "rules", label: "校验" },
   { key: "events", label: "事件" },
 ];
@@ -86,6 +88,7 @@ const tabEvents = computed(() => selectedMaterial.value?.events ?? []);
       <div class="inspector__body wb-scroll">
         <PropsEditor v-if="nodeTab === 'props'" />
         <StyleEditor v-else-if="nodeTab === 'style'" />
+        <LogicEditor v-else-if="nodeTab === 'logic'" />
         <RulesEditor v-else-if="nodeTab === 'rules'" />
         <EventsEditor v-else />
       </div>
