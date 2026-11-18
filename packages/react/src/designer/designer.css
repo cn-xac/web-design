@@ -1803,6 +1803,15 @@ select.wbd-input.wbd-sm {
 
 /* ---------------- 数据计算弹窗（rtHicl） ---------------- */
 .style__cond-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* 左右结构：左侧可选元素、右侧算式与函数；窄屏回落单栏（与 Vue CalculationDialog 镜像） */
+.calc__layout { display: grid; grid-template-columns: minmax(240px, 38%) minmax(0, 1fr); gap: 18px; align-items: start; }
+.calc__left, .calc__right { min-width: 0; }
+.calc__left { border-right: 1px solid var(--wb-line-soft); padding-right: 16px; }
+.calc__rows--left { max-height: 420px; }
+@media (max-width: 860px) {
+  .calc__layout { grid-template-columns: 1fr; }
+  .calc__left { border-right: 0; border-bottom: 1px solid var(--wb-line-soft); padding-right: 0; padding-bottom: 12px; }
+}
 .calc__hint { font-size: 12px; line-height: 1.8; color: var(--wb-ink2); }
 .calc__path { font-family: var(--wb-mono); color: var(--wb-primary); }
 .calc__section { margin: 14px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--wb-ink3); }

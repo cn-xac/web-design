@@ -11,6 +11,7 @@
  */
 
 import { extractPath } from "../schema/expression";
+import { canOwnExternalSource } from "../data/bindable";
 import { MATERIALS } from "../materials/catalog";
 import { createRegistry, type MaterialRegistry } from "../materials/registry";
 import type { NodeSchema, PageSchema } from "../schema/types";
@@ -38,13 +39,20 @@ export interface CanCalculateOptions {
 }
 
 /**
- * 目标元素资格判定：文字和数字元素。
- * 未知物料（CI stub 环境 / 业务物料）退化为按组件名判定，不因缺元数据而全禁。
+ * 目标元素资格判定：能被计算结果回填的元素。
+ *
+ * 口径（与 canOwnExternalSource 同源，避免清单漂移）：
+ * - 文字 / 数字类展示元素（text/title/statistic/input 等）；
+ * - 表单控件（含数字输入框等），以及选项类物料（select/radio/checkbox 等）：
+ *   这些元素的值本身就是可自定义/可写的，计算结果回填到它的值路径即可；
+ * - 未知物料退化为按组件名判定，不因缺元数据而全禁。
  */
 export function canOwnCalculation(node: NodeSchema, options: CanCalculateOptions = {}): boolean {
   const registry = options.registry ?? createRegistry(MATERIALS);
   const material = registry.get(node.component);
   if (material?.textProp) return true;
+  // 表单控件 + 选项类物料：值可写，能承载计算结果
+  if (canOwnExternalSource(node.component, registry)) return true;
   const key = bareKey(node.component);
   if (CALCULABLE_KEYS.has(key)) return true;
   return key.includes("number") || key.includes("statistic");

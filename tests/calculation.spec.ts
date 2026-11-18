@@ -369,9 +369,13 @@ describe("协议校验与落库", () => {
     expect(SCHEMA_VERSION).toBe("1.3.0");
   });
 
-  it("只有文字 / 数字元素能配置计算，目标清单能拿到回填路径", () => {
+  it("文字 / 数字 / 选项类控件都能承载计算，目标清单能拿到回填路径", () => {
     expect(canOwnCalculation({ id: "t1", component: "ec-text" })).toBe(true);
     expect(canOwnCalculation({ id: "t2", component: "ec-number" })).toBe(true);
+    // 选项 / 下拉 / 单选等「值可自定义」的控件也能作为计算回填目标
+    expect(canOwnCalculation({ id: "t4", component: "select" })).toBe(true);
+    expect(canOwnCalculation({ id: "t5", component: "radio" })).toBe(true);
+    expect(canOwnCalculation({ id: "t6", component: "checkbox" })).toBe(true);
     expect(canOwnCalculation({ id: "t3", component: "ec-container" })).toBe(false);
     const targets = collectCalculationTargets(pageWith(config()));
     expect(targets).toHaveLength(1);

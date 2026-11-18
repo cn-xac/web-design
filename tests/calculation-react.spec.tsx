@@ -164,6 +164,10 @@ describe("React 设计器：数据计算弹窗", () => {
       await openCalculationDialog(ui.container);
 
       expect(ui.container.querySelector(".wbd-modal__title")?.textContent).toContain("配置高级计算");
+      // 左右结构：参与元素在左栏，函数与算式在右栏
+      expect(ui.container.querySelector(".calc__layout")).toBeTruthy();
+      expect(ui.container.querySelector(".calc__left .calc__element")).toBeTruthy();
+      expect(ui.container.querySelector(".calc__right .calc__fn")).toBeTruthy();
       expect(ui.container.querySelectorAll(".calc__fn").length).toBeGreaterThan(10);
 
       await setNativeValue(ui.container.querySelector(".calc__element") as HTMLSelectElement, "form.f2");

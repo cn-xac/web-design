@@ -133,6 +133,10 @@ describe("Vue 设计器：数据计算弹窗", () => {
     await openCalculationDialog(wrapper);
 
     expect(wrapper.find(".wbd-modal__title").text()).toContain("配置高级计算");
+    // 左右结构：参与元素在左栏，函数与算式在右栏
+    expect(wrapper.find(".calc__layout").exists()).toBe(true);
+    expect(wrapper.find(".calc__left .calc__element").exists()).toBe(true);
+    expect(wrapper.find(".calc__right .calc__fn").exists()).toBe(true);
     expect(wrapper.findAll(".calc__fn").length).toBeGreaterThan(10);
 
     await wrapper.find(".calc__element").setValue("form.f2");

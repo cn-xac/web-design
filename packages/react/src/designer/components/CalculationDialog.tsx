@@ -329,7 +329,7 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
   return (
     <ModalShell
       title="配置高级计算"
-      width="760px"
+      width="980px"
       escToClose={!helpVisible}
       onClose={onClose}
       footer={
@@ -354,8 +354,10 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
         引用子表单明细字段时需指定聚合口径；算式只允许受限运算与下方白名单函数，不会执行任意代码。
       </div>
 
+      <div className="calc__layout">
+      <div className="calc__left">
       <div className="calc__section">参与元素</div>
-      <div className="calc__rows wb-scroll">
+      <div className="calc__rows calc__rows--left wb-scroll">
         {draft.operands.map((operand, index) => (
           <div className="calc__row" key={index}>
             <span className="calc__no">{index + 1}</span>
@@ -420,7 +422,9 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
       >
         ＋ 添加元素
       </UiControl>
+      </div>{/* /calc__left */}
 
+      <div className="calc__right">
       <div className="calc__section">算式</div>
       <div className="calc__builder">
         <div className="calc__token-row">
@@ -711,6 +715,8 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
           </UiControl>
         </>
       ) : null}
+      </div>{/* /calc__right */}
+      </div>{/* /calc__layout */}
 
       <div className="calc__preview">{preview}</div>
       {helpVisible ? <CalculationHelpDialog onClose={() => setHelpVisible(false)} /> : null}

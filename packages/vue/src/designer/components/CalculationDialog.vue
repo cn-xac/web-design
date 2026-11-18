@@ -342,7 +342,7 @@ function clear(): void {
   <ModalShell
     v-if="dialog.visible.value && dialog.target.value"
     title="配置高级计算"
-    width="760px"
+    width="980px"
     :esc-to-close="!helpVisible"
     @close="dialog.close()"
   >
@@ -351,8 +351,10 @@ function clear(): void {
       <br />引用子表单明细字段时需指定聚合口径；算式只允许受限运算与下方白名单函数，不会执行任意代码。
     </div>
 
+    <div class="calc__layout">
+    <div class="calc__left">
     <div class="calc__section">参与元素</div>
-    <div class="calc__rows wb-scroll">
+    <div class="calc__rows calc__rows--left wb-scroll">
       <div v-for="(operand, index) in draft.operands" :key="index" class="calc__row">
         <span class="calc__no">{{ index + 1 }}</span>
         <UiControl
@@ -391,7 +393,9 @@ function clear(): void {
       <div v-if="!draft.operands.length" class="calc__empty">还没有参与元素</div>
     </div>
     <UiControl as="Button" class="calc__add" @click="addOperand">＋ 添加元素</UiControl>
+    </div><!-- /calc__left -->
 
+    <div class="calc__right">
     <div class="calc__section">算式</div>
     <div class="calc__builder">
       <div class="calc__token-row">
@@ -560,6 +564,8 @@ function clear(): void {
       </div>
       <UiControl as="Button" class="calc__add" @click="addConditionRow">＋ 添加条件</UiControl>
     </template>
+    </div><!-- /calc__right -->
+    </div><!-- /calc__layout -->
 
     <div class="calc__preview">{{ preview }}</div>
 
@@ -574,6 +580,28 @@ function clear(): void {
 </template>
 
 <style scoped>
+/* 左右结构：左侧可选元素、右侧算式与函数；窄屏回落单栏 */
+.calc__layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 38%) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.calc__left,
+.calc__right {
+  min-width: 0;
+}
+.calc__left {
+  border-right: 1px solid var(--wb-line-soft);
+  padding-right: 16px;
+}
+.calc__rows--left {
+  max-height: 420px;
+}
+@media (max-width: 860px) {
+  .calc__layout { grid-template-columns: 1fr; }
+  .calc__left { border-right: 0; border-bottom: 1px solid var(--wb-line-soft); padding-right: 0; padding-bottom: 12px; }
+}
 .calc__hint {
   font-size: 12px;
   line-height: 1.8;
