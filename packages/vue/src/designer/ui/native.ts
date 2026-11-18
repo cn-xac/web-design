@@ -73,6 +73,8 @@ export const NativeInput = defineComponent({
         : h("input", {
             ...attrs,
             class: ["wbd-input", sizeClass(props.size), (attrs.class as string) ?? ""],
+            // 允许条件右值等场景用 number / date / datetime-local / month 输入；text 为默认
+            type: ["number", "date", "datetime-local", "month"].includes(props.type) ? props.type : "text",
             value: props.modelValue,
             placeholder: props.placeholder,
             disabled: props.disabled,

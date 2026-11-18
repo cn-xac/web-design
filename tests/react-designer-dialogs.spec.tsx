@@ -608,6 +608,35 @@ describe("React 设计器：右值按左元素类型渲染（rVDILq）", () => {
       await ui.cleanup();
     }
   });
+
+  it("关系下拉按左元素类型过滤；切换元素时旧关系不适用则回退首项", async () => {
+    const ui = await openWith([
+      { id: "dept", component: "select", props: { options: "技术中心 tech\n产品中心 product" } },
+      { id: "age", component: "number", props: { label: "年龄" } },
+    ]);
+    try {
+      const opLabels = () =>
+        [...(ui.container.querySelectorAll(".cond__operator option") as NodeListOf<HTMLOptionElement>)].map(
+          (option) => option.textContent ?? "",
+        );
+
+      // 默认空左元素按文本兜底
+      expect(opLabels()).toContain("开头是");
+      expect(opLabels()).not.toContain("大于");
+
+      await selectInto(ui.container.querySelector(".cond__left") as HTMLSelectElement, "form.age");
+      expect(opLabels()).toContain("大于");
+      expect(opLabels()).not.toContain("包含");
+
+      await selectInto(ui.container.querySelector(".cond__operator") as HTMLSelectElement, "gt");
+      await selectInto(ui.container.querySelector(".cond__left") as HTMLSelectElement, "form.dept");
+      expect(opLabels()).toContain("包含");
+      expect(opLabels()).not.toContain("大于");
+      expect((ui.container.querySelector(".cond__operator") as HTMLSelectElement).value).toBe("eq");
+    } finally {
+      await ui.cleanup();
+    }
+  });
 });
 
 describe("React 设计器：问号提示浮层", () => {

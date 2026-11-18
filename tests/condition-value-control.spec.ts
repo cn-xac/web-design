@@ -4,8 +4,10 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  conditionOperatorsFor,
   conditionValueOptions,
   elementValueKind,
+  resolveConditionOperatorsByPath,
   resolveConditionValueControl,
   resolveConditionValueControlByPath,
   type ConditionElement,
@@ -139,5 +141,87 @@ describe("resolveConditionValueControlByPath：设计器一站式入口", () => 
   it("路径找不到元素时按文本兜底，不抛错", () => {
     expect(resolveConditionValueControlByPath(page, elements, "form.missing", "eq", "x").kind).toBe("text");
     expect(resolveConditionValueControlByPath(page, elements, undefined, "eq", "x").kind).toBe("text");
+  });
+});
+
+describe("关系候选按元素类型过滤（rVDILq 续）", () => {
+  const values = (kind: Parameters<typeof conditionOperatorsFor>[0]): string[] =>
+    conditionOperatorsFor(kind).map((option) => option.value);
+
+  it("数字/日期只有等值 + 大小关系，无字符串关系", () => {
+    for (const kind of ["number", "date"] as const) {
+      expect(values(kind)).toContain("gt");
+      expect(values(kind)).toContain("lte");
+      expect(values(kind)).not.toContain("contains");
+      expect(values(kind)).not.toContain("startsWith");
+    }
+  });
+
+  it("文本有 contains/startsWith/endsWith，但没有大小关系", () => {
+    expect(values("text")).toEqual(
+      expect.arrayContaining(["eq", "ne", "contains", "notContains", "startsWith", "endsWith"]),
+    );
+    expect(values("text")).not.toContain("gt");
+    expect(values("text")).not.toContain("gte");
+  });
+
+  it("选项类给等值 + 包含，开关给真假；一元关系对所有类型都在", () => {
+    expect(values("options")).toEqual(expect.arrayContaining(["eq", "ne", "contains", "notContains"]));
+    expect(values("options")).not.toContain("gt");
+    expect(values("boolean")).toEqual(expect.arrayContaining(["eq", "ne", "truthy", "falsy"]));
+    expect(values("boolean")).not.toContain("contains");
+    for (const kind of ["number", "date", "boolean", "options", "text"] as const) {
+      expect(values(kind)).toEqual(expect.arrayContaining(["empty", "notEmpty"]));
+    }
+  });
+
+  it("按路径取元素类型过滤关系；左元素为空按文本兜底", () => {
+    const page: PageSchema = {
+      schemaVersion: "1.3.0",
+      id: "p2",
+      type: "page",
+      children: [
+        { id: "num", component: "number", props: {} },
+        { id: "sel", component: "select", props: { options: "A a" } },
+      ],
+    };
+    const elements: ConditionElement[] = [
+      {
+        nodeId: "num", path: "form.num", label: "数量", title: "数字输入", component: "number",
+        isOption: false, isGroup: false, isFormControl: true, subformId: null, inSubform: false, requiresAggregate: false,
+      },
+      {
+        nodeId: "sel", path: "form.sel", label: "选择", title: "下拉选择", component: "select",
+        isOption: true, isGroup: false, isFormControl: true, subformId: null, inSubform: false, requiresAggregate: false,
+      },
+    ];
+    const numOps = resolveConditionOperatorsByPath(page, elements, "form.num").map((o) => o.value);
+    expect(numOps).toContain("gt");
+    expect(numOps).not.toContain("contains");
+
+    const selOps = resolveConditionOperatorsByPath(page, elements, "form.sel").map((o) => o.value);
+    expect(selOps).toContain("contains");
+    expect(selOps).not.toContain("gt");
+
+    const blankOps = resolveConditionOperatorsByPath(page, elements, undefined).map((o) => o.value);
+    expect(blankOps).toContain("startsWith");
+  });
+
+  it("旧配置的不合法关系补「保留旧关系」候选，不静默改写", () => {
+    const page: PageSchema = {
+      schemaVersion: "1.3.0", id: "p3", type: "page",
+      children: [{ id: "num", component: "number", props: {} }],
+    };
+    const elements: ConditionElement[] = [
+      {
+        nodeId: "num", path: "form.num", label: "数量", title: "数字输入", component: "number",
+        isOption: false, isGroup: false, isFormControl: true, subformId: null, inSubform: false, requiresAggregate: false,
+      },
+    ];
+    const list = resolveConditionOperatorsByPath(page, elements, "form.num", "contains");
+    expect(list[0].value).toBe("contains");
+    expect(list[0].label).toContain("保留旧关系");
+    // 合法关系不补兼容项
+    expect(resolveConditionOperatorsByPath(page, elements, "form.num", "gt")[0].value).toBe("eq");
   });
 });

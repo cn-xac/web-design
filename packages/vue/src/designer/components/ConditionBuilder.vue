@@ -20,6 +20,7 @@ import {
   VISIBILITY_ACTIONS,
   collectConditionElements,
   findLocation,
+  resolveConditionOperatorsByPath,
   resolveConditionValueControlByPath,
   validateAdvancedExpression,
   type ConditionGroup,
@@ -32,6 +33,7 @@ import { useDesignerStore } from "../store";
 import { useConditionDialog } from "../dialogs";
 import { useNotify } from "../ui/kit";
 import ModalShell from "../ui/ModalShell.vue";
+import UiControl from "../ui/UiControl.vue";
 
 interface DraftRow extends ConditionRow {
   /** 仅 UI 状态：勾选后该行只有 value，不落库 */
@@ -110,21 +112,41 @@ function isUnary(operator: ConditionRow["operator"]): boolean {
   return CONDITION_OPERATOR_OPTIONS.find((option) => option.value === operator)?.unary ?? false;
 }
 
-/** 右值控件完全由 core 判定，本组件只按描述渲染，不自带类型映射表 */
+/** 右值控件与关系候选完全由 core 判定，本组件只按描述渲染，不自带类型映射表 */
 function controlOf(row: DraftRow) {
   return resolveConditionValueControlByPath(store.page, elements.value, row.left, row.operator, row.value);
 }
 
-/** 切换左元素时清空旧值：旧值属于上一个元素的选项，留着只会命中错误分支 */
-function onLeftChange(row: DraftRow, event: Event): void {
-  row.left = (event.target as HTMLSelectElement).value;
+function operatorsOf(row: DraftRow) {
+  return resolveConditionOperatorsByPath(store.page, elements.value, row.left, row.operator);
+}
+
+/** 切换左元素时清空旧值；旧关系若不适用于新元素类型，回退到候选首项 */
+function onLeftChange(row: DraftRow, left: string): void {
+  row.left = left;
   row.value = "";
+  // 不传当前关系：兼容项只用于载入旧配置，主动切换左元素必须回退到纯候选
+  const allowed = resolveConditionOperatorsByPath(store.page, elements.value, left);
+  if (!allowed.some((option) => option.value === row.operator)) {
+    row.operator = allowed[0]?.value ?? "eq";
+  }
 }
 
 /** 右侧下拉选值：core 把选项 value 定为落库值，直接写入即可 */
-function onValueChange(row: DraftRow, event: Event): void {
-  row.value = (event.target as HTMLSelectElement).value;
+function onValueChange(row: DraftRow, value: string): void {
+  row.value = value;
 }
+
+/** UiControl 的 Select 要求 options 形态为 { label, value } */
+const leftOptions = computed(() =>
+  elements.value.map((element) => ({
+    label: `${element.label}（${element.path}）`,
+    value: element.path,
+  })),
+);
+const aggregateOptions = computed(() =>
+  CONDITION_AGGREGATES.map((option) => ({ label: option.label, value: option.value })),
+);
 
 function addRow(): void {
   draft.value.rows.push(blankRow());
@@ -215,35 +237,36 @@ function setMode(mode: ConditionMode): void {
 
     <div class="cond__section">命中时动作</div>
     <div class="cond__modes">
-      <button
+      <UiControl
         v-for="option in VISIBILITY_ACTIONS"
         :key="option.value"
-        type="button"
+        as="Button"
         class="cond__mode"
         :class="{ 'is-active': action === option.value }"
         :title="option.hint"
         @click="action = option.value"
       >
         {{ option.label }}
-      </button>
+      </UiControl>
     </div>
 
     <div class="cond__section">条件间关系</div>
     <div class="cond__modes">
-      <button
+      <UiControl
         v-for="option in CONDITION_MODE_OPTIONS"
         :key="option.value"
-        type="button"
+        as="Button"
         class="cond__mode"
         :class="{ 'is-active': draft.mode === option.value }"
         @click="setMode(option.value)"
       >
         {{ option.label }}
-      </button>
+      </UiControl>
     </div>
 
     <div v-if="draft.mode === 'advanced'" class="cond__advanced">
-      <input
+      <UiControl
+        as="Input"
         v-model="draft.expression"
         class="cond__expression wb-mono"
         type="text"
@@ -261,50 +284,47 @@ function setMode(mode: ConditionMode): void {
         <span class="cond__no">{{ index + 1 }}</span>
 
         <template v-if="!row.valueOnly">
-          <select
-            :value="row.left ?? ''"
+          <UiControl
+            as="Select"
+            :model-value="row.left ?? ''"
+            :options="leftOptions"
+            placeholder="选择元素"
             class="cond__select cond__left"
             aria-label="左元素"
-            @change="onLeftChange(row, $event)"
-          >
-            <option value="">选择元素</option>
-            <option v-for="element in elements" :key="element.nodeId" :value="element.path">
-              {{ element.label }}（{{ element.path }}）
-            </option>
-          </select>
+            @update:model-value="(left: string) => onLeftChange(row, left)"
+          />
 
-          <select
+          <UiControl
             v-if="requiresAggregate(row.left)"
+            as="Select"
             v-model="row.aggregate"
+            :options="aggregateOptions"
             class="cond__select cond__aggregate"
             aria-label="聚合口径"
-          >
-            <option v-for="option in CONDITION_AGGREGATES" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
+          />
 
-          <select v-model="row.operator" class="cond__select cond__operator" aria-label="关系">
-            <option v-for="option in CONDITION_OPERATOR_OPTIONS" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
+          <UiControl
+            as="Select"
+            v-model="row.operator"
+            :options="operatorsOf(row)"
+            class="cond__select cond__operator"
+            aria-label="关系"
+          />
 
           <template v-if="controlOf(row).kind !== 'none'">
-            <select
+            <UiControl
               v-if="controlOf(row).kind === 'options' || controlOf(row).kind === 'boolean'"
-              :value="String(row.value ?? '')"
+              as="Select"
+              :model-value="String(row.value ?? '')"
+              :options="controlOf(row).options"
+              placeholder="请选择"
               class="cond__select cond__value cond__value-select"
               aria-label="右侧值"
-              @change="onValueChange(row, $event)"
-            >
-              <option value="">请选择</option>
-              <option v-for="option in controlOf(row).options" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-            <input
+              @update:model-value="(value: string) => onValueChange(row, value)"
+            />
+            <UiControl
               v-else
+              as="Input"
               v-model="row.value"
               class="cond__value"
               :type="controlOf(row).inputType ?? 'text'"
@@ -316,8 +336,9 @@ function setMode(mode: ConditionMode): void {
           <span v-else class="cond__value-placeholder">—</span>
         </template>
 
-        <input
+        <UiControl
           v-else
+          as="Input"
           v-model="row.value"
           class="cond__value cond__value--only"
           type="text"
@@ -325,20 +346,20 @@ function setMode(mode: ConditionMode): void {
         />
 
         <label class="cond__only" title="特殊场景：只填值，不设左元素与关系">
-          <input type="checkbox" :checked="row.valueOnly" @change="toggleValueOnly(row)" />仅值
+          <UiControl as="Switch" :model-value="Boolean(row.valueOnly)" @update:model-value="toggleValueOnly(row)" />仅值
         </label>
-        <button type="button" class="cond__del" aria-label="删除条件" @click="removeRow(index)">×</button>
+        <UiControl as="Button" class="cond__del" aria-label="删除条件" @click="removeRow(index)">×</UiControl>
       </div>
       <div v-if="!draft.rows.length" class="cond__empty">还没有条件，点击「添加条件」开始</div>
     </div>
 
-    <button type="button" class="cond__add" @click="addRow">＋ 添加条件</button>
+    <UiControl as="Button" class="cond__add" @click="addRow">＋ 添加条件</UiControl>
 
     <template #footer>
-      <button type="button" class="cond__clear" @click="clear">清空</button>
+      <UiControl as="Button" class="cond__clear" @click="clear">清空</UiControl>
       <span class="cond__spacer" />
-      <button type="button" class="cond__cancel" @click="dialog.close()">取消</button>
-      <button type="button" class="cond__ok" @click="save">确定</button>
+      <UiControl as="Button" class="cond__cancel" @click="dialog.close()">取消</UiControl>
+      <UiControl as="Button" type="primary" class="cond__ok" @click="save">确定</UiControl>
     </template>
   </ModalShell>
 </template>

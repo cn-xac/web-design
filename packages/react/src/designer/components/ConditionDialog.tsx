@@ -19,6 +19,7 @@ import {
   VISIBILITY_ACTIONS,
   collectConditionElements,
   findLocation,
+  resolveConditionOperatorsByPath,
   resolveConditionValueControlByPath,
   validateAdvancedExpression,
 } from "@x-ac/web-design-core";
@@ -31,6 +32,7 @@ import type {
 } from "@x-ac/web-design-core";
 import { useDesigner } from "../context";
 import type { ConditionTarget } from "../dialogs";
+import { UiControl } from "../ui";
 import { ModalShell } from "./ModalShell";
 
 interface DraftRow extends ConditionRow {
@@ -91,13 +93,23 @@ export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
   const isUnary = (operator?: ConditionRow["operator"]): boolean =>
     CONDITION_OPERATOR_OPTIONS.find((option) => option.value === operator)?.unary ?? false;
 
-  /** 右值控件完全由 core 判定，本组件只按描述渲染，不自带类型映射表 */
+  /** 右值控件与关系候选完全由 core 判定，本组件只按描述渲染，不自带类型映射表 */
   const controlOf = (row: DraftRow) =>
     resolveConditionValueControlByPath(state.page, elements, row.left, row.operator, row.value);
 
-  /** 切换左元素时清空旧值：旧值属于上一个元素的选项，留着只会命中错误分支 */
-  const onLeftChange = (index: number, left: string): void =>
-    updateRow(index, { left, value: "" });
+  const operatorsOf = (row: DraftRow) =>
+    resolveConditionOperatorsByPath(state.page, elements, row.left, row.operator);
+
+  /** 切换左元素时清空旧值；旧关系若不适用于新元素类型，回退到候选首项 */
+  const onLeftChange = (index: number, left: string): void => {
+    const row = draft.rows[index];
+    // 不传当前关系：兼容项只用于载入旧配置，主动切换左元素必须回退到纯候选
+    const allowed = resolveConditionOperatorsByPath(state.page, elements, left);
+    const operator = allowed.some((option) => option.value === row.operator)
+      ? row.operator
+      : (allowed[0]?.value ?? "eq");
+    updateRow(index, { left, value: "", operator });
+  };
 
   const patch = (partial: Partial<Draft>): void => setDraft((current) => ({ ...current, ...partial }));
 
@@ -168,8 +180,8 @@ export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
       onClose={onClose}
       footer={
         <>
-          <button
-            type="button"
+          <UiControl
+            as="Button"
             className="cond__clear"
             onClick={() => {
               setDraft({ mode: "and", rows: [blankRow()], expression: "" });
@@ -177,14 +189,14 @@ export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
             }}
           >
             清空
-          </button>
+          </UiControl>
           <span className="cond__spacer" />
-          <button type="button" className="cond__cancel" onClick={onClose}>
+          <UiControl as="Button" className="cond__cancel" onClick={onClose}>
             取消
-          </button>
-          <button type="button" className="cond__ok" onClick={save}>
+          </UiControl>
+          <UiControl as="Button" type="primary" className="cond__ok" onClick={save}>
             确定
-          </button>
+          </UiControl>
         </>
       }
     >
@@ -197,41 +209,42 @@ export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
       <div className="cond__section">命中时动作</div>
       <div className="cond__modes">
         {VISIBILITY_ACTIONS.map((option) => (
-          <button
-            type="button"
+          <UiControl
+            as="Button"
             key={option.value}
             className={`cond__mode${action === option.value ? " is-active" : ""}`}
             title={option.hint}
             onClick={() => setAction(option.value)}
           >
             {option.label}
-          </button>
+          </UiControl>
         ))}
       </div>
 
       <div className="cond__section">条件间关系</div>
       <div className="cond__modes">
         {CONDITION_MODE_OPTIONS.map((option) => (
-          <button
-            type="button"
+          <UiControl
+            as="Button"
             key={option.value}
             className={`cond__mode${draft.mode === option.value ? " is-active" : ""}`}
             onClick={() => setMode(option.value)}
           >
             {option.label}
-          </button>
+          </UiControl>
         ))}
       </div>
 
       {draft.mode === "advanced" ? (
         <div className="cond__advanced">
-          <input
+          <UiControl
+            as="Input"
             className="cond__expression wb-mono"
             type="text"
             spellCheck={false}
             placeholder="1 and (2 or 3)"
             value={draft.expression}
-            onChange={(event) => patch({ expression: event.target.value })}
+            onChange={(value: string) => patch({ expression: value })}
           />
           <div className={`cond__tip${expressionError ? " is-error" : ""}`}>
             {expressionError || "用条件序号组合，支持 and / or / not 与括号，序号从 1 开始。"}
@@ -247,76 +260,70 @@ export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
 
             {!row.valueOnly ? (
               <>
-                <select
+                <UiControl
+                  as="Select"
                   className="cond__select cond__left"
                   aria-label="左元素"
+                  placeholder="选择元素"
                   value={row.left ?? ""}
-                  onChange={(event) => onLeftChange(index, event.target.value)}
-                >
-                  <option value="">选择元素</option>
-                  {elements.map((element) => (
-                    <option key={element.nodeId} value={element.path}>
-                      {element.label}（{element.path}）
-                    </option>
-                  ))}
-                </select>
+                  options={elements.map((element) => ({
+                    label: `${element.label}（${element.path}）`,
+                    value: element.path,
+                  }))}
+                  onChange={(value: string) => onLeftChange(index, value)}
+                />
 
                 {requiresAggregate(row.left) ? (
-                  <select
+                  <UiControl
+                    as="Select"
                     className="cond__select cond__aggregate"
                     aria-label="聚合口径"
                     value={row.aggregate ?? "sum"}
-                    onChange={(event) =>
-                      updateRow(index, { aggregate: event.target.value as DraftRow["aggregate"] })
+                    options={CONDITION_AGGREGATES.map((option) => ({
+                      label: option.label,
+                      value: option.value,
+                    }))}
+                    onChange={(value: string) =>
+                      updateRow(index, { aggregate: value as DraftRow["aggregate"] })
                     }
-                  >
-                    {CONDITION_AGGREGATES.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 ) : null}
 
-                <select
+                <UiControl
+                  as="Select"
                   className="cond__select cond__operator"
                   aria-label="关系"
                   value={row.operator ?? "eq"}
-                  onChange={(event) =>
-                    updateRow(index, { operator: event.target.value as ConditionRow["operator"] })
+                  options={operatorsOf(row).map((option) => ({ label: option.label, value: option.value }))}
+                  onChange={(value: string) =>
+                    updateRow(index, { operator: value as ConditionRow["operator"] })
                   }
-                >
-                  {CONDITION_OPERATOR_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                />
 
                 {controlOf(row).kind !== "none" ? (
                   controlOf(row).kind === "options" || controlOf(row).kind === "boolean" ? (
-                    <select
+                    <UiControl
+                      as="Select"
                       className="cond__select cond__value cond__value-select"
                       aria-label="右侧值"
+                      placeholder="请选择"
                       value={String(row.value ?? "")}
-                      onChange={(event) => updateRow(index, { value: event.target.value })}
-                    >
-                      <option value="">请选择</option>
-                      {controlOf(row).options.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      options={controlOf(row).options.map((option) => ({
+                        label: option.label,
+                        value: option.value,
+                      }))}
+                      onChange={(value: string) => updateRow(index, { value })}
+                    />
                   ) : (
-                    <input
+                    <UiControl
+                      as="Input"
                       className="cond__value"
                       type={controlOf(row).inputType ?? "text"}
                       aria-label="右侧值"
                       placeholder={controlOf(row).kind === "legacy" ? "旧值，请重新选择" : "请输入值"}
                       title={controlOf(row).hint}
                       value={String(row.value ?? "")}
-                      onChange={(event) => updateRow(index, { value: event.target.value })}
+                      onChange={(value: string) => updateRow(index, { value })}
                     />
                   )
                 ) : (
@@ -324,39 +331,44 @@ export function ConditionDialog({ target, onClose }: ConditionDialogProps) {
                 )}
               </>
             ) : (
-              <input
+              <UiControl
+                as="Input"
                 className="cond__value cond__value--only"
                 type="text"
                 placeholder="仅值：表达式或字面量，如 {{form.amount}} > 10"
                 value={String(row.value ?? "")}
-                onChange={(event) => updateRow(index, { value: event.target.value })}
+                onChange={(value: string) => updateRow(index, { value })}
               />
             )}
 
             <label className="cond__only" title="特殊场景：只填值，不设左元素与关系">
-              <input
-                type="checkbox"
-                checked={Boolean(row.valueOnly)}
+              <UiControl
+                as="Switch"
+                value={Boolean(row.valueOnly)}
                 onChange={() => toggleValueOnly(index, row)}
               />
               仅值
             </label>
-            <button
-              type="button"
+            <UiControl
+              as="Button"
               className="cond__del"
               aria-label="删除条件"
               onClick={() => patch({ rows: draft.rows.filter((_, i) => i !== index) })}
             >
               ×
-            </button>
+            </UiControl>
           </div>
         ))}
         {!draft.rows.length ? <div className="cond__empty">还没有条件，点击「添加条件」开始</div> : null}
       </div>
 
-      <button type="button" className="cond__add" onClick={() => patch({ rows: [...draft.rows, blankRow()] })}>
+      <UiControl
+        as="Button"
+        className="cond__add"
+        onClick={() => patch({ rows: [...draft.rows, blankRow()] })}
+      >
         ＋ 添加条件
-      </button>
+      </UiControl>
     </ModalShell>
   );
 }

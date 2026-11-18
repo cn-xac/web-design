@@ -23,7 +23,7 @@ export interface DesignerControlProps {
   value?: unknown;
   onChange?: (value: any) => void;
   options?: Array<string | number | SelectOption>;
-  type?: "default" | "primary" | "danger" | "text" | "number" | "color";
+  type?: "default" | "primary" | "danger" | "text" | "number" | "color" | "date" | "datetime-local" | "month";
   size?: "small" | "default";
   disabled?: boolean;
   placeholder?: string;
@@ -44,6 +44,9 @@ export interface DesignerControlProps {
   onClick?: () => void;
   children?: ReactNode;
   plain?: boolean;
+  /** 原生 title / spellCheck：设计器控件常需要提示文案与关闭拼写检查 */
+  title?: string;
+  spellCheck?: boolean;
 }
 
 type Control = ComponentType<DesignerControlProps>;
@@ -56,11 +59,12 @@ const normalizeOptions = (options: DesignerControlProps["options"] = []): Select
   );
 
 function NativeButton(props: DesignerControlProps) {
-  const { type = "default", size = "small", disabled, className = "", onClick, children } = props;
+  const { type = "default", size = "small", disabled, className = "", onClick, children, title } = props;
   return (
     <button
       type="button"
       disabled={disabled}
+      title={title}
       onClick={onClick}
       className={`wbd-btn wbd-btn--${type}${size === "small" ? " wbd-sm" : ""} ${className}`.trim()}
     >
@@ -70,16 +74,20 @@ function NativeButton(props: DesignerControlProps) {
 }
 
 function NativeInput(props: DesignerControlProps) {
-  const { value, onChange, type, rows, placeholder, disabled, className = "" } = props;
+  const { value, onChange, type, rows, placeholder, disabled, className = "", title, spellCheck } = props;
   const shared = {
     value: value === undefined || value === null ? "" : String(value),
     placeholder,
     disabled,
+    title,
+    spellCheck,
     className: `wbd-input${rows && rows > 1 ? " wbd-input--area" : ""} ${className}`.trim(),
     onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       onChange?.(event.target.value),
   };
-  return rows && rows > 1 ? <textarea {...shared} rows={rows} /> : <input {...shared} type={type === "number" ? "number" : "text"} />;
+  const inputType =
+    type === "number" || type === "date" || type === "datetime-local" || type === "month" ? type : "text";
+  return rows && rows > 1 ? <textarea {...shared} rows={rows} /> : <input {...shared} type={inputType} />;
 }
 
 function NativeNumber(props: DesignerControlProps) {

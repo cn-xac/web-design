@@ -110,7 +110,7 @@ describe("设计器：显示 / 隐藏条件弹窗", () => {
 
     const rows = wrapper.findAll(".cond__row");
     for (const row of rows) {
-      await row.find(".cond__only input").setValue(true);
+      await row.find(".cond__only [role=switch]").trigger("click");
       await row.find(".cond__value--only").setValue("true");
     }
 
@@ -270,6 +270,30 @@ describe("设计器：右值按左元素类型渲染（rVDILq）", () => {
     await wrapper.find(".cond__ok").trigger("click");
     await tick();
     expect(store.page.children[0].visibility?.when.rows[0].value).toBe("{{form.old}}");
+  });
+
+  it("关系下拉按左元素类型过滤；切换元素时旧关系不适用则回退首项", async () => {
+    const { wrapper } = await mountWithSelect();
+    const operatorLabels = () =>
+      wrapper.find(".cond__operator").findAll("option").map((option) => option.text());
+
+    // 默认空左元素按文本兜底：有 startsWith，无 gt
+    expect(operatorLabels()).toContain("开头是");
+    expect(operatorLabels()).not.toContain("大于");
+
+    // 数字元素：有大于，无包含
+    await wrapper.find(".cond__left").setValue("form.age");
+    await tick();
+    expect(operatorLabels()).toContain("大于");
+    expect(operatorLabels()).not.toContain("包含");
+
+    // 选一个数字专属关系，再切到选项元素：应回退到候选首项「等于」
+    await wrapper.find(".cond__operator").setValue("gt");
+    await wrapper.find(".cond__left").setValue("form.dept");
+    await tick();
+    expect(operatorLabels()).toContain("包含");
+    expect(operatorLabels()).not.toContain("大于");
+    expect((wrapper.find(".cond__operator").element as HTMLSelectElement).value).toBe("eq");
   });
 });
 

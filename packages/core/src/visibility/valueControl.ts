@@ -20,7 +20,7 @@ import { OPTION_COMPONENTS } from "../data/bindable";
 import { parseOptions, type OptionItem } from "../materials/utils";
 import { findLocation } from "../schema/tree";
 import type { PageSchema } from "../schema/types";
-import type { ConditionOperator } from "./types";
+import { CONDITION_OPERATOR_OPTIONS, type ConditionOperator } from "./types";
 import type { ConditionElement } from "./sources";
 
 /** 右值控件种类 */
@@ -82,6 +82,61 @@ export function conditionValueOptions(source: ConditionValueSource): ConditionVa
   return items.map((item) => ({ label: item.label, value: item.value }));
 }
 
+/** 元素最终的值类型：配置过 options 的 input 也升级为选项类，与右值控件判定共用 */
+export function resolveElementValueKind(source: ConditionValueSource): ElementValueKind {
+  return conditionValueOptions(source).length > 0
+    ? "options"
+    : elementValueKind(source.component, source.isOption);
+}
+
+/* --------------------------- 关系运算符候选 --------------------------- */
+
+/** 关系候选项，直接复用 core 的权威常量类型 */
+export type ConditionOperatorOption = (typeof CONDITION_OPERATOR_OPTIONS)[number];
+
+/** 各值类型可用的二元关系；unary（为空/不为空）对所有类型开放 */
+const OPERATORS_BY_KIND: Record<ElementValueKind, ReadonlySet<ConditionOperator>> = {
+  number: new Set(["eq", "ne", "gt", "gte", "lt", "lte"]),
+  date: new Set(["eq", "ne", "gt", "gte", "lt", "lte"]),
+  boolean: new Set(["eq", "ne", "truthy", "falsy"]),
+  options: new Set(["eq", "ne", "contains", "notContains"]),
+  text: new Set(["eq", "ne", "contains", "notContains", "startsWith", "endsWith"]),
+};
+const UNARY_OPERATORS: ReadonlySet<ConditionOperator> = new Set(["empty", "notEmpty"]);
+
+/** 按元素值类型给出关系候选，顺序与 label 均来自 CONDITION_OPERATOR_OPTIONS */
+export function conditionOperatorsFor(kind: ElementValueKind): ConditionOperatorOption[] {
+  const allowed = OPERATORS_BY_KIND[kind];
+  return CONDITION_OPERATOR_OPTIONS.filter(
+    (option) => UNARY_OPERATORS.has(option.value) || allowed.has(option.value),
+  );
+}
+
+/**
+ * 设计器一站式入口：按左元素路径取节点类型，给出可用关系。
+ * - 左元素为空 / 找不到节点：按文本兜底，仍给一组候选，不让下拉变空；
+ * - 旧配置的关系不在候选里：补一条「保留旧关系」置顶，避免打开弹窗就把值改掉。
+ */
+export function resolveConditionOperatorsByPath(
+  page: PageSchema,
+  elements: ReadonlyArray<ConditionElement>,
+  left: string | undefined,
+  current?: ConditionOperator,
+): ConditionOperatorOption[] {
+  const element = elements.find((item) => item.path === left);
+  const source: ConditionValueSource = element
+    ? {
+        component: element.component,
+        isOption: element.isOption,
+        props: findLocation(page.children, element.nodeId)?.node?.props,
+      }
+    : {};
+  const list = conditionOperatorsFor(resolveElementValueKind(source));
+  if (!current || list.some((option) => option.value === current)) return list;
+  const legacy = CONDITION_OPERATOR_OPTIONS.find((option) => option.value === current);
+  return legacy ? [{ ...legacy, label: `保留旧关系：${legacy.label}` }, ...list] : list;
+}
+
 function isExpressionValue(value: unknown): boolean {
   return typeof value === "string" && value.trim().includes("{{");
 }
@@ -117,11 +172,8 @@ export function resolveConditionValueControl(
   }
 
   const rawOptions = conditionValueOptions(source);
-  const hasOptions = rawOptions.length > 0;
-  // input 配了候选就变成可点选输入框（catalog 的口径），按选项类处理
-  const kind: ElementValueKind = hasOptions
-    ? "options"
-    : elementValueKind(source.component, source.isOption);
+  // 与关系候选共用同一类型判定：input 配了候选就按选项类处理
+  const kind = resolveElementValueKind(source);
   const textValue = asText(value);
   const hasValue = textValue !== "";
   const inOptions = (values: string[]): boolean => !hasValue || values.includes(textValue);
