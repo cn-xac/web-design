@@ -536,7 +536,7 @@ function remove(): void {
       <!-- 基本信息 -->
       <div class="ext__row">
         <label class="ext__label">名称</label>
-        <input v-model="draft.name" class="ext__input" placeholder="如 部门列表" spellcheck="false" />
+        <UiControl as="Input" v-model="draft.name" class="ext__input" placeholder="如 部门列表" spellcheck="false" />
       </div>
 
       <div class="ext__row ext__row--split">
@@ -546,27 +546,29 @@ function remove(): void {
         </div>
         <div class="ext__cell ext__cell--grow">
           <label class="ext__label">请求地址 URL</label>
-          <input v-model="draft.url" class="ext__input wb-mono" placeholder="/api/dept/list" spellcheck="false" />
+          <UiControl as="Input" v-model="draft.url" class="ext__input wb-mono" placeholder="/api/dept/list" spellcheck="false" />
         </div>
       </div>
 
       <div class="ext__row">
         <label class="ext__label">请求头</label>
-        <button type="button" class="ext__ghost" @click="openHeaders">
+        <UiControl as="Button" class="ext__ghost" @click="openHeaders">
           {{ headerCount ? `已设置 ${headerCount} 个请求头` : "设置请求头…" }}
-        </button>
+        </UiControl>
       </div>
 
       <!-- 触发：本数据源绑定在点击的元素上，触发值即取自该元素 -->
       <div class="ext__row ext__row--split">
         <div class="ext__cell">
           <label class="ext__label">触发长度</label>
-          <input
-            v-model.number="draft.triggerLength"
+          <UiControl
+            as="Input"
+            :model-value="draft.triggerLength"
             class="ext__input"
             type="number"
-            min="0"
+            :min="0"
             placeholder="0 = 加载即取"
+            @update:model-value="(v: string | number) => (draft.triggerLength = Number(v) || 0)"
           />
         </div>
         <div class="ext__cell ext__cell--grow">
@@ -577,13 +579,15 @@ function remove(): void {
       <div class="ext__row ext__row--split">
         <div class="ext__cell">
           <label class="ext__label">防抖延时（毫秒）</label>
-          <input
-            v-model.number="draft.debounceMs"
+          <UiControl
+            as="Input"
+            :model-value="draft.debounceMs"
             class="ext__input"
             type="number"
-            min="0"
+            :min="0"
             placeholder="默认 300"
             :disabled="draft.triggerLength <= 0"
+            @update:model-value="(v: string | number) => (draft.debounceMs = Number(v) || 0)"
           />
         </div>
         <div class="ext__cell ext__cell--grow">
@@ -597,7 +601,7 @@ function remove(): void {
       </div>
 
       <label class="ext__switch">
-        <input v-model="draft.once" type="checkbox" />
+        <UiControl as="Switch" :model-value="draft.once" @update:model-value="(v: boolean) => (draft.once = v)" />
         <span>只请求一次（当前页面仅请求一次）</span>
       </label>
 
@@ -608,7 +612,7 @@ function remove(): void {
       </div>
       <div class="ext__params">
         <div v-for="(item, index) in draft.params" :key="index" class="ext__param">
-          <input v-model="item.key" class="ext__input" placeholder="参数名" spellcheck="false" />
+          <UiControl as="Input" v-model="item.key" class="ext__input" placeholder="参数名" spellcheck="false" />
           <UiControl
             as="Select"
             :model-value="item.path"
@@ -619,9 +623,9 @@ function remove(): void {
             placeholder="选择元素…"
             @update:model-value="(v: string) => onParamElement(index, v)"
           />
-          <button type="button" class="ext__del" title="删除" @click="removeParam(index)">×</button>
+          <UiControl as="Button" class="ext__del" title="删除" @click="removeParam(index)">×</UiControl>
         </div>
-        <button type="button" class="ext__ghost ext__ghost--block" @click="addParam">+ 添加参数</button>
+        <UiControl as="Button" class="ext__ghost ext__ghost--block" @click="addParam">+ 添加参数</UiControl>
       </div>
 
       <!-- 响应数据映射（多条，#4） -->
@@ -633,7 +637,8 @@ function remove(): void {
            所以放在顶层，而不是每条映射里各填一遍。 -->
       <div class="ext__row">
         <label class="ext__label">列表字段</label>
-        <input
+        <UiControl
+          as="Input"
           v-model="draft.listField"
           class="ext__input wb-mono"
           placeholder="响应里数组所在的字段，如 data.list；留空 = 响应本身是数组"
@@ -645,7 +650,7 @@ function remove(): void {
           <div class="ext__resp-head">
             <span class="ext__resp-no">映射 {{ index + 1 }}</span>
             <HelpTip :text="tipOf(resp)" />
-            <button type="button" class="ext__del" title="删除映射" @click="removeResponse(index)">×</button>
+            <UiControl as="Button" class="ext__del" title="删除映射" @click="removeResponse(index)">×</UiControl>
           </div>
           <!-- 目标元素：候选项基于上面的「列表字段」逐项生成，这里只选写给谁 -->
           <div class="ext__row">
@@ -662,33 +667,34 @@ function remove(): void {
           </div>
           <div class="ext__row">
             <label class="ext__label">写入路径</label>
-            <input v-model="resp.scopePath" class="ext__input wb-mono" placeholder="如 external.deptList" spellcheck="false" />
+            <UiControl as="Input" v-model="resp.scopePath" class="ext__input wb-mono" placeholder="如 external.deptList" spellcheck="false" />
           </div>
           <div v-if="isGroupTarget(resp)" class="ext__row ext__row--split">
             <div class="ext__cell">
               <label class="ext__label">父字段名</label>
-              <input v-model="resp.parentField" class="ext__input wb-mono" placeholder="如 items" spellcheck="false" />
+              <UiControl as="Input" v-model="resp.parentField" class="ext__input wb-mono" placeholder="如 items" spellcheck="false" />
             </div>
             <div class="ext__cell ext__cell--grow">
               <label class="ext__label">子映射</label>
-              <button type="button" class="ext__ghost" @click="openSubMap(index)">
+              <UiControl as="Button" class="ext__ghost" @click="openSubMap(index)">
                 {{ resp.subMaps.length ? `已配置 ${resp.subMaps.length} 项` : "设置子映射…" }}
-              </button>
+              </UiControl>
             </div>
           </div>
           <div v-if="isOptionTarget(resp)" class="ext__row ext__row--split">
             <div class="ext__cell">
               <label class="ext__label">值字段</label>
-              <input v-model="resp.valueField" class="ext__input wb-mono" placeholder="留空 = 用名称" spellcheck="false" />
+              <UiControl as="Input" v-model="resp.valueField" class="ext__input wb-mono" placeholder="留空 = 用名称" spellcheck="false" />
             </div>
             <div class="ext__cell">
               <label class="ext__label">名称字段</label>
-              <input v-model="resp.labelField" class="ext__input wb-mono" placeholder="label" spellcheck="false" />
+              <UiControl as="Input" v-model="resp.labelField" class="ext__input wb-mono" placeholder="label" spellcheck="false" />
             </div>
           </div>
           <div v-if="isValueTarget(resp)" class="ext__row">
             <label class="ext__label">显示内容</label>
-            <input
+            <UiControl
+              as="Input"
               v-model="resp.display"
               class="ext__input wb-mono"
               :placeholder="DISPLAY_PLACEHOLDER"
@@ -696,15 +702,15 @@ function remove(): void {
             />
           </div>
         </div>
-        <button type="button" class="ext__ghost ext__ghost--block" @click="addResponse">+ 添加响应映射</button>
+        <UiControl as="Button" class="ext__ghost ext__ghost--block" @click="addResponse">+ 添加响应映射</UiControl>
       </div>
     </div>
 
     <template #footer>
-      <button type="button" class="ext__remove" @click="remove">移除数据源</button>
+      <UiControl as="Button" class="ext__remove" @click="remove">移除数据源</UiControl>
       <span class="ext__spacer" />
-      <button type="button" class="ext__cancel" @click="dialog.close()">取消</button>
-      <button type="button" class="ext__ok" @click="save">保存</button>
+      <UiControl as="Button" class="ext__cancel" @click="dialog.close()">取消</UiControl>
+      <UiControl as="Button" type="primary" class="ext__ok" @click="save">保存</UiControl>
     </template>
   </ModalShell>
 </template>

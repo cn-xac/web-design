@@ -194,7 +194,7 @@ describe("React 设计器：选项录入弹窗", () => {
       await ui.select("r1");
       await click(ui.container.querySelector(".props__options-btn"));
 
-      await click(ui.container.querySelector(".opts__source-switch input"));
+      await click(ui.container.querySelector(".opts__source-switch [role=switch]"));
       const url = ui.container.querySelector('input[placeholder="/api/dict/list"]') as HTMLInputElement;
       expect(url).toBeTruthy();
       await typeInto(url, "/api/org/list");

@@ -493,16 +493,16 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
       onClose={onClose}
       footer={
         <>
-          <button type="button" className="ext__remove" onClick={remove}>
+          <UiControl as="Button" className="ext__remove" onClick={remove}>
             移除数据源
-          </button>
+          </UiControl>
           <span className="ext__spacer" />
-          <button type="button" className="ext__cancel" onClick={onClose}>
+          <UiControl as="Button" className="ext__cancel" onClick={onClose}>
             取消
-          </button>
-          <button type="button" className="ext__ok" onClick={save}>
+          </UiControl>
+          <UiControl as="Button" type="primary" className="ext__ok" onClick={save}>
             保存
-          </button>
+          </UiControl>
         </>
       }
     >
@@ -510,12 +510,13 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
         {/* 基本信息 */}
         <div className="ext__row">
           <label className="ext__label">名称</label>
-          <input
+          <UiControl
+            as="Input"
             className="ext__input"
             value={draft.name}
             placeholder="如 部门列表"
             spellCheck={false}
-            onChange={(event) => patchDraft({ name: event.target.value })}
+            onChange={(value: string) => patchDraft({ name: value })}
           />
         </div>
 
@@ -532,34 +533,36 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
           </div>
           <div className="ext__cell ext__cell--grow">
             <label className="ext__label">请求地址 URL</label>
-            <input
+            <UiControl
+              as="Input"
               className="ext__input wb-mono"
               value={draft.url}
               placeholder="/api/dept/list"
               spellCheck={false}
-              onChange={(event) => patchDraft({ url: event.target.value })}
+              onChange={(value: string) => patchDraft({ url: value })}
             />
           </div>
         </div>
 
         <div className="ext__row">
           <label className="ext__label">请求头</label>
-          <button type="button" className="ext__ghost" onClick={() => void openHeaders()}>
+          <UiControl as="Button" className="ext__ghost" onClick={() => void openHeaders()}>
             {headerCount ? `已设置 ${headerCount} 个请求头` : "设置请求头…"}
-          </button>
+          </UiControl>
         </div>
 
         {/* 触发：本数据源绑定在点击的元素上，触发值即取自该元素 */}
         <div className="ext__row ext__row--split">
           <div className="ext__cell">
             <label className="ext__label">触发长度</label>
-            <input
+            <UiControl
+              as="Input"
               className="ext__input"
               type="number"
               min={0}
               value={draft.triggerLength}
               placeholder="0 = 加载即取"
-              onChange={(event) => patchDraft({ triggerLength: Number(event.target.value) || 0 })}
+              onChange={(value: string) => patchDraft({ triggerLength: Number(value) || 0 })}
             />
           </div>
           <div className="ext__cell ext__cell--grow">
@@ -572,16 +575,17 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
         <div className="ext__row ext__row--split">
           <div className="ext__cell">
             <label className="ext__label">防抖延时（毫秒）</label>
-            <input
+            <UiControl
+              as="Input"
               className="ext__input"
               type="number"
               min={0}
               value={draft.debounceMs}
               placeholder="默认 300"
               disabled={draft.triggerLength <= 0}
-              onChange={(event) =>
+              onChange={(value: string) =>
                 patchDraft({
-                  debounceMs: event.target.value === "" ? "" : Number(event.target.value) || 0,
+                  debounceMs: value === "" ? "" : Number(value) || 0,
                 })
               }
             />
@@ -598,10 +602,10 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
         </div>
 
         <label className="ext__switch">
-          <input
-            type="checkbox"
-            checked={draft.once}
-            onChange={(event) => patchDraft({ once: event.target.checked })}
+          <UiControl
+            as="Switch"
+            value={draft.once}
+            onChange={(value: boolean) => patchDraft({ once: value })}
           />
           <span>只请求一次（当前页面仅请求一次）</span>
         </label>
@@ -614,12 +618,13 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
         <div className="ext__params">
           {draft.params.map((item, index) => (
             <div className="ext__param" key={index}>
-              <input
+              <UiControl
+                as="Input"
                 className="ext__input"
                 value={item.key}
                 placeholder="参数名"
                 spellCheck={false}
-                onChange={(event) => setParam(index, { key: event.target.value })}
+                onChange={(value: string) => setParam(index, { key: value })}
               />
               <UiControl
                 as="Select"
@@ -631,14 +636,14 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
                 options={elementOptions}
                 onChange={(value: unknown) => onParamElement(index, String(value ?? ""))}
               />
-              <button type="button" className="ext__del" title="删除" onClick={() => removeParam(index)}>
+              <UiControl as="Button" className="ext__del" title="删除" onClick={() => removeParam(index)}>
                 ×
-              </button>
+              </UiControl>
             </div>
           ))}
-          <button type="button" className="ext__ghost ext__ghost--block" onClick={addParam}>
+          <UiControl as="Button" className="ext__ghost ext__ghost--block" onClick={addParam}>
             + 添加参数
-          </button>
+          </UiControl>
         </div>
 
         {/* 响应数据映射（多条） */}
@@ -650,12 +655,13 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
              所以放在顶层，而不是每条映射里各填一遍。 */}
         <div className="ext__row">
           <label className="ext__label">列表字段</label>
-          <input
+          <UiControl
+            as="Input"
             className="ext__input wb-mono"
             value={draft.listField}
             placeholder="响应里数组所在的字段，如 data.list；留空 = 响应本身是数组"
             spellCheck={false}
-            onChange={(event) => patchDraft({ listField: event.target.value })}
+            onChange={(value: string) => patchDraft({ listField: value })}
           />
         </div>
         <div className="ext__params">
@@ -664,14 +670,14 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
               <div className="ext__resp-head">
                 <span className="ext__resp-no">映射 {index + 1}</span>
                 <HelpTip text={tipOf(resp)} />
-                <button
-                  type="button"
+                <UiControl
+                  as="Button"
                   className="ext__del"
                   title="删除映射"
                   onClick={() => removeResponse(index)}
                 >
                   ×
-                </button>
+                </UiControl>
               </div>
               {/* 目标元素：候选项基于上面的「列表字段」逐项生成，这里只选写给谁 */}
               <div className="ext__row">
@@ -688,31 +694,33 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
               </div>
               <div className="ext__row">
                 <label className="ext__label">写入路径</label>
-                <input
+                <UiControl
+                  as="Input"
                   className="ext__input wb-mono"
                   value={resp.scopePath}
                   placeholder="如 external.deptList"
                   spellCheck={false}
-                  onChange={(event) => patchResponse(index, { scopePath: event.target.value })}
+                  onChange={(value: string) => patchResponse(index, { scopePath: value })}
                 />
               </div>
               {isGroupTarget(resp) ? (
                 <div className="ext__row ext__row--split">
                   <div className="ext__cell">
                     <label className="ext__label">父字段名</label>
-                    <input
+                    <UiControl
+                      as="Input"
                       className="ext__input wb-mono"
                       value={resp.parentField}
                       placeholder="如 items"
                       spellCheck={false}
-                      onChange={(event) => patchResponse(index, { parentField: event.target.value })}
+                      onChange={(value: string) => patchResponse(index, { parentField: value })}
                     />
                   </div>
                   <div className="ext__cell ext__cell--grow">
                     <label className="ext__label">子映射</label>
-                    <button type="button" className="ext__ghost" onClick={() => void openSubMap(index)}>
+                    <UiControl as="Button" className="ext__ghost" onClick={() => void openSubMap(index)}>
                       {resp.subMaps.length ? `已配置 ${resp.subMaps.length} 项` : "设置子映射…"}
-                    </button>
+                    </UiControl>
                   </div>
                 </div>
               ) : null}
@@ -720,22 +728,24 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
                 <div className="ext__row ext__row--split">
                   <div className="ext__cell">
                     <label className="ext__label">值字段</label>
-                    <input
+                    <UiControl
+                      as="Input"
                       className="ext__input wb-mono"
                       value={resp.valueField}
                       placeholder="留空 = 用名称"
                       spellCheck={false}
-                      onChange={(event) => patchResponse(index, { valueField: event.target.value })}
+                      onChange={(value: string) => patchResponse(index, { valueField: value })}
                     />
                   </div>
                   <div className="ext__cell">
                     <label className="ext__label">名称字段</label>
-                    <input
+                    <UiControl
+                      as="Input"
                       className="ext__input wb-mono"
                       value={resp.labelField}
                       placeholder="label"
                       spellCheck={false}
-                      onChange={(event) => patchResponse(index, { labelField: event.target.value })}
+                      onChange={(value: string) => patchResponse(index, { labelField: value })}
                     />
                   </div>
                 </div>
@@ -743,20 +753,21 @@ export function ExternalSourceDialog({ target, onClose }: ExternalSourceDialogPr
               {isValueTarget(resp) ? (
                 <div className="ext__row">
                   <label className="ext__label">显示内容</label>
-                  <input
+                  <UiControl
+                    as="Input"
                     className="ext__input wb-mono"
                     value={resp.display}
                     placeholder={DISPLAY_PLACEHOLDER}
                     spellCheck={false}
-                    onChange={(event) => patchResponse(index, { display: event.target.value })}
+                    onChange={(value: string) => patchResponse(index, { display: value })}
                   />
                 </div>
               ) : null}
             </div>
           ))}
-          <button type="button" className="ext__ghost ext__ghost--block" onClick={addResponse}>
+          <UiControl as="Button" className="ext__ghost ext__ghost--block" onClick={addResponse}>
             + 添加响应映射
-          </button>
+          </UiControl>
         </div>
       </div>
     </ModalShell>

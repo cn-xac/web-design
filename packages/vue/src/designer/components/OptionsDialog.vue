@@ -219,7 +219,7 @@ function openExternal(): void {
     <!-- 选项数据源开关（#5） -->
     <div class="opts__source">
       <label class="opts__source-switch">
-        <input v-model="optOn" type="checkbox" />
+        <UiControl as="Switch" :model-value="optOn" @update:model-value="(v: boolean) => (optOn = v)" />
         <span>使用选项数据源（从接口取选项）</span>
       </label>
     </div>
@@ -235,13 +235,13 @@ function openExternal(): void {
       </div>
       <div class="opts__row">
         <label class="opts__label">请求地址</label>
-        <input v-model="optDraft.url" class="opts__input wb-mono" placeholder="/api/dict/list" spellcheck="false" />
+        <UiControl as="Input" v-model="optDraft.url" class="opts__input wb-mono" placeholder="/api/dict/list" spellcheck="false" />
       </div>
 
       <div class="opts__section">请求参数（可选，来自页面元素）</div>
       <div class="opts__params">
         <div v-for="(item, index) in optDraft.params" :key="index" class="opts__param">
-          <input v-model="item.key" class="opts__input" placeholder="参数名" spellcheck="false" />
+          <UiControl as="Input" v-model="item.key" class="opts__input" placeholder="参数名" spellcheck="false" />
           <UiControl
             as="Select"
             :model-value="item.path"
@@ -252,36 +252,36 @@ function openExternal(): void {
             placeholder="选择元素…"
             @update:model-value="(v: string) => onParamElement(index, v)"
           />
-          <button type="button" class="opts__del" title="删除" @click="removeParam(index)">×</button>
+          <UiControl as="Button" class="opts__del" title="删除" @click="removeParam(index)">×</UiControl>
         </div>
-        <button type="button" class="opts__ghost--block" @click="addParam">+ 添加参数</button>
+        <UiControl as="Button" class="opts__ghost--block" @click="addParam">+ 添加参数</UiControl>
       </div>
 
       <div class="opts__row">
         <label class="opts__label">列表字段</label>
-        <input v-model="optDraft.listField" class="opts__input wb-mono" placeholder="如 data.list（留空=响应本身即数组）" spellcheck="false" />
+        <UiControl as="Input" v-model="optDraft.listField" class="opts__input wb-mono" placeholder="如 data.list（留空=响应本身即数组）" spellcheck="false" />
       </div>
       <div class="opts__row opts__row--split">
         <div class="opts__cell">
           <label class="opts__label">名称字段 <em class="opts__req">*</em></label>
-          <input v-model="optDraft.labelField" class="opts__input wb-mono" placeholder="label" spellcheck="false" />
+          <UiControl as="Input" v-model="optDraft.labelField" class="opts__input wb-mono" placeholder="label" spellcheck="false" />
         </div>
         <div class="opts__cell">
           <label class="opts__label">值字段</label>
-          <input v-model="optDraft.valueField" class="opts__input wb-mono" placeholder="留空 = 用名称" spellcheck="false" />
+          <UiControl as="Input" v-model="optDraft.valueField" class="opts__input wb-mono" placeholder="留空 = 用名称" spellcheck="false" />
         </div>
       </div>
       <label class="opts__switch">
-        <input v-model="optDraft.once" type="checkbox" />
+        <UiControl as="Switch" :model-value="optDraft.once" @update:model-value="(v: boolean) => (optDraft.once = v)" />
         <span>只请求一次</span>
       </label>
       <div class="opts__tip">
         运行时由接口返回并映射为选项的「名称 / 值」；未设值字段时值默认等于名称。结果写入
         <code>options.{{ node?.id }}</code>，本元素的 options 已自动绑定。
       </div>
-      <button type="button" class="opts__adv" @click="openExternal">
+      <UiControl as="Button" class="opts__adv" @click="openExternal">
         需要多条响应 / 缓存策略等高级配置？打开「外部数据源」 →
-      </button>
+      </UiControl>
     </div>
 
     <!-- 手工录入 -->
@@ -291,10 +291,12 @@ function openExternal(): void {
         只写名称时，值与名称相同。示例：<code>技术中心&nbsp;&nbsp;tech</code>
       </div>
 
-      <textarea
+      <UiControl
+        as="Input"
         v-model="text"
         class="opts__text wb-mono"
-        rows="9"
+        type="textarea"
+        :rows="9"
         spellcheck="false"
         placeholder="技术中心  tech&#10;产品中心  product"
       />
@@ -314,10 +316,10 @@ function openExternal(): void {
     </template>
 
     <template #footer>
-      <button v-if="!optOn" type="button" class="opts__clear" @click="clear">清空</button>
+      <UiControl v-if="!optOn" as="Button" class="opts__clear" @click="clear">清空</UiControl>
       <span class="opts__spacer" />
-      <button type="button" class="opts__cancel" @click="dialog.close()">取消</button>
-      <button type="button" class="opts__ok" @click="save">确定</button>
+      <UiControl as="Button" class="opts__cancel" @click="dialog.close()">取消</UiControl>
+      <UiControl as="Button" type="primary" class="opts__ok" @click="save">确定</UiControl>
     </template>
   </ModalShell>
 </template>

@@ -195,24 +195,24 @@ export function OptionsDialog({ target, onClose }: OptionsDialogProps) {
       footer={
         <>
           {!optOn ? (
-            <button type="button" className="opts__clear" onClick={clear}>
+            <UiControl as="Button" className="opts__clear" onClick={clear}>
               清空
-            </button>
+            </UiControl>
           ) : null}
           <span className="opts__spacer" />
-          <button type="button" className="opts__cancel" onClick={onClose}>
+          <UiControl as="Button" className="opts__cancel" onClick={onClose}>
             取消
-          </button>
-          <button type="button" className="opts__ok" onClick={save}>
+          </UiControl>
+          <UiControl as="Button" type="primary" className="opts__ok" onClick={save}>
             确定
-          </button>
+          </UiControl>
         </>
       }
     >
       {/* 选项数据源开关 */}
       <div className="opts__source">
         <label className="opts__source-switch">
-          <input type="checkbox" checked={optOn} onChange={(event) => setOptOn(event.target.checked)} />
+          <UiControl as="Switch" value={optOn} onChange={(value: boolean) => setOptOn(value)} />
           <span>使用选项数据源（从接口取选项）</span>
         </label>
       </div>
@@ -231,12 +231,13 @@ export function OptionsDialog({ target, onClose }: OptionsDialogProps) {
           </div>
           <div className="opts__row">
             <label className="opts__label">请求地址</label>
-            <input
+            <UiControl
+              as="Input"
               className="opts__input wb-mono"
               value={draft.url}
               placeholder="/api/dict/list"
               spellCheck={false}
-              onChange={(event) => patch({ url: event.target.value })}
+              onChange={(value: string) => patch({ url: value })}
             />
           </div>
 
@@ -244,12 +245,13 @@ export function OptionsDialog({ target, onClose }: OptionsDialogProps) {
           <div className="opts__params">
             {draft.params.map((item, index) => (
               <div className="opts__param" key={index}>
-                <input
+                <UiControl
+                  as="Input"
                   className="opts__input"
                   value={item.key}
                   placeholder="参数名"
                   spellCheck={false}
-                  onChange={(event) => setParam(index, { key: event.target.value })}
+                  onChange={(value: string) => setParam(index, { key: value })}
                 />
                 <UiControl
                   as="Select"
@@ -261,24 +263,25 @@ export function OptionsDialog({ target, onClose }: OptionsDialogProps) {
                   options={elementOptions}
                   onChange={(value: unknown) => onParamElement(index, String(value ?? ""))}
                 />
-                <button type="button" className="opts__del" title="删除" onClick={() => removeParam(index)}>
+                <UiControl as="Button" className="opts__del" title="删除" onClick={() => removeParam(index)}>
                   ×
-                </button>
+                </UiControl>
               </div>
             ))}
-            <button type="button" className="opts__ghost--block" onClick={addParam}>
+            <UiControl as="Button" className="opts__ghost--block" onClick={addParam}>
               + 添加参数
-            </button>
+            </UiControl>
           </div>
 
           <div className="opts__row">
             <label className="opts__label">列表字段</label>
-            <input
+            <UiControl
+              as="Input"
               className="opts__input wb-mono"
               value={draft.listField}
               placeholder="如 data.list（留空=响应本身即数组）"
               spellCheck={false}
-              onChange={(event) => patch({ listField: event.target.value })}
+              onChange={(value: string) => patch({ listField: value })}
             />
           </div>
           <div className="opts__row opts__row--split">
@@ -286,36 +289,38 @@ export function OptionsDialog({ target, onClose }: OptionsDialogProps) {
               <label className="opts__label">
                 名称字段 <em className="opts__req">*</em>
               </label>
-              <input
+              <UiControl
+                as="Input"
                 className="opts__input wb-mono"
                 value={draft.labelField}
                 placeholder="label"
                 spellCheck={false}
-                onChange={(event) => patch({ labelField: event.target.value })}
+                onChange={(value: string) => patch({ labelField: value })}
               />
             </div>
             <div className="opts__cell">
               <label className="opts__label">值字段</label>
-              <input
+              <UiControl
+                as="Input"
                 className="opts__input wb-mono"
                 value={draft.valueField}
                 placeholder="留空 = 用名称"
                 spellCheck={false}
-                onChange={(event) => patch({ valueField: event.target.value })}
+                onChange={(value: string) => patch({ valueField: value })}
               />
             </div>
           </div>
           <label className="opts__switch">
-            <input type="checkbox" checked={draft.once} onChange={(event) => patch({ once: event.target.checked })} />
+            <UiControl as="Switch" value={draft.once} onChange={(value: boolean) => patch({ once: value })} />
             <span>只请求一次</span>
           </label>
           <div className="opts__tip">
             运行时由接口返回并映射为选项的「名称 / 值」；未设值字段时值默认等于名称。结果写入
             <code>options.{node?.id}</code>，本元素的 options 已自动绑定。
           </div>
-          <button type="button" className="opts__adv" onClick={openExternal}>
+          <UiControl as="Button" className="opts__adv" onClick={openExternal}>
             需要多条响应 / 缓存策略等高级配置？打开「外部数据源」 →
-          </button>
+          </UiControl>
         </div>
       ) : (
         <>
@@ -325,13 +330,14 @@ export function OptionsDialog({ target, onClose }: OptionsDialogProps) {
             只写名称时，值与名称相同。示例：<code>技术中心&nbsp;&nbsp;tech</code>
           </div>
 
-          <textarea
+          <UiControl
+            as="Input"
             className="opts__text wb-mono"
             rows={9}
             spellCheck={false}
             value={text}
             placeholder={"技术中心  tech\n产品中心  product"}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(value: string) => setText(value)}
           />
 
           <div className="opts__preview-head">
