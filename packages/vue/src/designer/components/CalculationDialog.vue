@@ -12,7 +12,6 @@
 import { computed, nextTick, ref, watch } from "vue";
 import {
   CALCULATION_AGGREGATES,
-  CALCULATION_ALIASES,
   CONDITION_MODE_OPTIONS,
   CONDITION_OPERATOR_OPTIONS,
   FORMULA_NUMBER_BUTTONS,
@@ -139,10 +138,6 @@ const guideElementOptions = computed(() =>
   })),
 );
 
-function blankOperand(): DraftOperand {
-  return { path: "", alias: CALCULATION_ALIASES[draft.value.operands.length] ?? `V${draft.value.operands.length + 1}`, aggregate: "sum" };
-}
-
 function blankConditionRow(): DraftConditionRow {
   return { left: "", operator: "eq", value: "", aggregate: "sum" };
 }
@@ -152,7 +147,7 @@ function load(): void {
   const config = findLocation(store.page.children, nodeId.value)?.node?.calculation;
   if (!config) {
     draft.value = {
-      operands: [blankOperand()],
+      operands: [],
       formula: "",
       precision: "",
       emptyAsZero: false,
@@ -164,13 +159,11 @@ function load(): void {
     return;
   }
   draft.value = {
-    operands: config.operands.length
-      ? config.operands.map((operand) => ({
-          path: operand.path,
-          alias: operand.alias,
-          aggregate: operand.aggregate ?? "sum",
-        }))
-      : [blankOperand()],
+    operands: config.operands.map((operand) => ({
+      path: operand.path,
+      alias: operand.alias,
+      aggregate: operand.aggregate ?? "sum",
+    })),
     formula: config.formula,
     precision: config.precision === undefined ? "" : String(config.precision),
     emptyAsZero: Boolean(config.emptyAsZero),
@@ -195,7 +188,7 @@ function buildConfig(): CalculationConfig | null {
       label: labelOf(operand.path),
       ...(requiresAggregate(operand.path) ? { aggregate: operand.aggregate } : {}),
     }));
-  if (!operands.length) return null;
+  // 新配置可无别名参与元素：算式直接引用 form.xxx 路径，operands 允许为空
 
   const whenRows: ConditionRow[] = draft.value.whenEnabled
     ? draft.value.whenRows
@@ -228,22 +221,18 @@ const formulaError = computed(() => validateCalculationFormula(draft.value.formu
 const preview = computed(() => {
   if (formulaError.value) return "算式语法有误，暂不能试算";
   const config = buildConfig();
-  if (!config) return "请先选择至少一个参与元素";
+  if (!config) return "请填写算式";
   const scope: Scope = JSON.parse(JSON.stringify(store.page.state ?? {})) as Scope;
-  for (const operand of config.operands) setByPath(scope, operand.path, 1);
+  if (config.operands.length) {
+    for (const operand of config.operands) setByPath(scope, operand.path, 1);
+  }
   const outcome = evaluateCalculation(config, scope, 0);
   return outcome.skipped
     ? `未参与计算：${outcome.reason ?? "条件未命中"}`
-    : `试算结果：${String(outcome.value)}（每个参与元素按 1 代入）`;
+    : config.operands.length
+      ? `试算结果：${String(outcome.value)}（每个别名元素按 1 代入）`
+      : `试算结果：${String(outcome.value)}（按当前页面数据）`;
 });
-
-function addOperand(): void {
-  draft.value.operands.push(blankOperand());
-}
-
-function removeOperand(index: number): void {
-  draft.value.operands.splice(index, 1);
-}
 
 function addConditionRow(): void {
   draft.value.whenRows.push(blankConditionRow());
@@ -269,7 +258,12 @@ function insertToken(token: string): void {
   });
 }
 
-/** Excel 式点选引用：点元素就把别名写进算式 */
+/** 点选元素：把它的绑定路径直接插入算式（无需别名映射） */
+function insertElement(path: string): void {
+  if (path.trim()) insertToken(path.trim());
+}
+
+/** 旧配置兼容：点选元素时仍可插入历史别名 */
 function insertOperand(alias: string): void {
   if (alias.trim()) insertToken(alias.trim());
 }
@@ -290,11 +284,10 @@ function closeFunctionGuide(): void {
   argSlots.value = [];
 }
 
-/** 参数槽里点选元素：把该元素的别名填进当前槽 */
+/** 参数槽里点选元素：直接填绑定路径；旧配置存在别名时优先用别名 */
 function setSlotFromElement(index: number, path: string): void {
-  const alias = draft.value.operands.find((operand) => operand.path === path)?.alias;
-  if (alias?.trim()) argSlots.value[index].value = alias.trim();
-  else notify("请先在上方的参与元素中加入该元素", "error");
+  const legacy = draft.value.operands.find((operand) => operand.path === path)?.alias;
+  argSlots.value[index].value = legacy?.trim() || path;
 }
 
 function onSlotElementChange(index: number, path: string): void {
@@ -353,46 +346,22 @@ function clear(): void {
 
     <div class="calc__layout">
     <div class="calc__left">
-    <div class="calc__section">参与元素</div>
-    <div class="calc__rows calc__rows--left wb-scroll">
-      <div v-for="(operand, index) in draft.operands" :key="index" class="calc__row">
-        <span class="calc__no">{{ index + 1 }}</span>
-        <UiControl
-          as="Select"
-          v-model="operand.path"
-          :options="elementOptions"
-          placeholder="选择元素"
-          class="calc__select calc__element"
-          aria-label="参与元素"
-        />
-        <UiControl
-          v-if="requiresAggregate(operand.path)"
-          as="Select"
-          v-model="operand.aggregate"
-          :options="aggregateOptions"
-          class="calc__select calc__aggregate"
-          aria-label="聚合口径"
-        />
-        <UiControl
-          as="Input"
-          v-model="operand.alias"
-          class="calc__alias"
-          type="text"
-          aria-label="算式变量名"
-          placeholder="变量名 A"
-        />
-        <UiControl
-          v-if="operand.alias.trim()"
-          as="Button"
-          class="calc__insert"
-          :title="`把 ${operand.alias} 插入算式`"
-          @click="insertOperand(operand.alias)"
-        >插入</UiControl>
-        <UiControl as="Button" class="calc__del" aria-label="删除参与元素" @click="removeOperand(index)">×</UiControl>
-      </div>
-      <div v-if="!draft.operands.length" class="calc__empty">还没有参与元素</div>
+    <div class="calc__section">可选元素（点击插入算式）</div>
+    <div class="calc__elements wb-scroll">
+      <button
+        v-for="element in elements"
+        :key="element.nodeId"
+        type="button"
+        class="calc__pick"
+        :title="`插入 ${element.path}`"
+        @click="insertElement(element.path)"
+      >
+        <span class="calc__pick-label">{{ element.label }}</span>
+        <span class="calc__pick-path">{{ element.path }}</span>
+      </button>
+      <div v-if="!elements.length" class="calc__empty">当前页面没有可计算的元素</div>
     </div>
-    <UiControl as="Button" class="calc__add" @click="addOperand">＋ 添加元素</UiControl>
+    <div class="calc__tip">计算结果自动回填到发起计算的元素：{{ targetPath || "当前元素" }}</div>
     </div><!-- /calc__left -->
 
     <div class="calc__right">
@@ -409,7 +378,7 @@ function clear(): void {
           @click="insertOperand(operand.alias)"
         >{{ operand.alias }}</UiControl>
         <span v-if="!draft.operands.some((item) => item.alias.trim())" class="calc__builder-empty">
-          先在上方添加参与元素
+          从左侧点选元素即可插入引用
         </span>
       </div>
       <div class="calc__token-row">
@@ -597,6 +566,41 @@ function clear(): void {
 }
 .calc__rows--left {
   max-height: 420px;
+}
+/* 可选元素列表：点选即插入路径引用 */
+.calc__elements {
+  max-height: 460px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.calc__pick {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  border: 1px solid var(--wb-line);
+  border-radius: 5px;
+  background: #fff;
+  cursor: pointer;
+  font-family: inherit;
+}
+.calc__pick:hover {
+  border-color: var(--wb-primary);
+  background: var(--wb-primary-soft);
+}
+.calc__pick-label {
+  font-size: 12px;
+  color: var(--wb-ink);
+}
+.calc__pick-path {
+  font-size: 11px;
+  color: var(--wb-ink3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 @media (max-width: 860px) {
   .calc__layout { grid-template-columns: 1fr; }

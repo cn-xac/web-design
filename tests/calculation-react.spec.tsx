@@ -166,22 +166,29 @@ describe("React 设计器：数据计算弹窗", () => {
       expect(ui.container.querySelector(".wbd-modal__title")?.textContent).toContain("配置高级计算");
       // 左右结构：参与元素在左栏，函数与算式在右栏
       expect(ui.container.querySelector(".calc__layout")).toBeTruthy();
-      expect(ui.container.querySelector(".calc__left .calc__element")).toBeTruthy();
+      expect(ui.container.querySelectorAll(".calc__left .calc__pick").length).toBeGreaterThan(0);
       expect(ui.container.querySelector(".calc__right .calc__fn")).toBeTruthy();
       expect(ui.container.querySelectorAll(".calc__fn").length).toBeGreaterThan(10);
 
-      await setNativeValue(ui.container.querySelector(".calc__element") as HTMLSelectElement, "form.f2");
+      // 点左侧元素 → 自动插入 form.f2 引用
+      const f2 = [...ui.container.querySelectorAll<HTMLElement>(".calc__pick")].find((b) =>
+        (b.textContent ?? "").includes("form.f2"),
+      );
+      expect(f2).toBeTruthy();
+      await click(f2);
+      expect((ui.container.querySelector(".calc__formula") as HTMLTextAreaElement).value).toContain("form.f2");
+
       await setNativeValue(
         ui.container.querySelector(".calc__formula") as HTMLTextAreaElement,
-        "ROUND(A * 1.5, 1)",
+        "ROUND(form.f2 * 1.5, 1)",
       );
       await click(ui.container.querySelector(".calc__ok"));
 
       const node = ui.nodeOf("f1");
       expect(node?.calculation).toMatchObject({
-        formula: "ROUND(A * 1.5, 1)",
-        operands: [{ alias: "A", path: "form.f2" }],
+        formula: "ROUND(form.f2 * 1.5, 1)",
       });
+      expect(node?.calculation?.operands).toEqual([]);
       expect(node?.props?.text).toBe("{{form.f1}}");
     } finally {
       await ui.cleanup();
@@ -292,20 +299,18 @@ describe("React 设计器：数据计算弹窗", () => {
       await ui.render();
       await ui.select("f1");
       await openCalculationDialog(ui.container);
-      await setNativeValue(ui.container.querySelector(".calc__element") as HTMLSelectElement, "form.f2");
-
-      // Excel 式点选：点元素别名与运算符，算式自动拼接并补空格
-      const chip = [...ui.container.querySelectorAll<HTMLElement>(".calc__chip")].find(
-        (button) => button.textContent?.trim() === "A",
+      // 点左侧元素 → 插入 form.f2 路径引用
+      const f2 = [...ui.container.querySelectorAll<HTMLElement>(".calc__pick")].find((b) =>
+        (b.textContent ?? "").includes("form.f2"),
       );
-      await click(chip);
+      await click(f2);
       await flush();
       const plus = [...ui.container.querySelectorAll<HTMLElement>(".calc__token")].find(
         (button) => button.textContent?.trim() === "+",
       );
       await click(plus);
       await flush();
-      expect((ui.container.querySelector(".calc__formula") as HTMLTextAreaElement).value).toContain("A + ");
+      expect((ui.container.querySelector(".calc__formula") as HTMLTextAreaElement).value).toContain("form.f2 + ");
 
       // 点函数走参数引导，填完槽才插入调用
       const sum = [...ui.container.querySelectorAll<HTMLElement>(".calc__fn")].find(
@@ -314,15 +319,15 @@ describe("React 设计器：数据计算弹窗", () => {
       await click(sum);
       const slots = ui.container.querySelectorAll<HTMLInputElement>(".calc__guide-input");
       expect(slots).toHaveLength(2);
-      await setNativeValue(slots[0], "A");
+      await setNativeValue(slots[0], "form.f2");
       await setNativeValue(slots[1], "1");
       await click(ui.container.querySelector(".calc__guide-ok"));
       await flush();
-      expect((ui.container.querySelector(".calc__formula") as HTMLTextAreaElement).value).toContain("SUM(A, 1)");
+      expect((ui.container.querySelector(".calc__formula") as HTMLTextAreaElement).value).toContain("SUM(form.f2, 1)");
       expect(ui.container.querySelector(".calc__guide")).toBeNull();
 
       await click(ui.container.querySelector(".calc__ok"));
-      expect(ui.nodeOf("f1")?.calculation?.formula).toContain("SUM(A, 1)");
+      expect(ui.nodeOf("f1")?.calculation?.formula).toContain("SUM(form.f2, 1)");
 
       await openCalculationDialog(ui.container);
       await click(ui.container.querySelector(".calc__clear"));

@@ -113,8 +113,10 @@ export function evaluateCalculation(
 ): CalculationOutcome {
   const formula = (config.formula ?? "").trim();
   const operands = config.operands ?? [];
-  if (!formula || operands.length === 0) {
-    return { value: undefined, skipped: true, reason: "未配置算式或参与元素" };
+  // 算式可直接引用路径（form.xxx），不再强制要求配置别名参与元素；
+  // 旧配置里的 operands 仍照常注入别名，保持向后兼容。
+  if (!formula) {
+    return { value: undefined, skipped: true, reason: "未配置算式" };
   }
   const syntax = validateExpression(formula, CALCULATION_FUNCTION_MAP);
   if (syntax) return { value: undefined, skipped: true, reason: `算式语法错误：${syntax}` };
@@ -208,9 +210,10 @@ export function validateCalculationConfig(config: unknown, targetPath?: string):
   if (formulaError) errors.push(formulaError);
 
   const operands = config.operands;
-  if (!Array.isArray(operands) || operands.length === 0) {
-    errors.push("至少选择一个参与元素");
-  } else {
+  // operands 允许为空：算式可直接引用 form.xxx 路径，无需别名映射
+  if (!Array.isArray(operands)) {
+    errors.push("operands 必须是数组");
+  } else if (operands.length > 0) {
     const aliases = new Set<string>();
     operands.forEach((raw, index) => {
       const prefix = `参与元素 ${index + 1}`;
@@ -237,6 +240,14 @@ export function validateCalculationConfig(config: unknown, targetPath?: string):
         errors.push(`${prefix} 的聚合口径只支持 sum / avg / min / max / text`);
       }
     });
+  }
+
+  // 路径直引场景：算式里不能引用计算结果的目标本身，否则会形成自我引用
+  if (targetPath && typeof config.formula === "string") {
+    const directRef = new RegExp(`\\b${targetPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
+    if (directRef.test(config.formula)) {
+      errors.push("算式不能引用当前元素自身");
+    }
   }
 
   if (

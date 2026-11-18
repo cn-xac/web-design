@@ -128,28 +128,34 @@ describe("Vue 设计器：数据计算弹窗", () => {
     wrapper.unmount();
   });
 
-  it("选参与元素 + 高级函数算式 → 保存后写入 node.calculation，并自动给文字元素绑定结果", async () => {
+  it("点选元素插入路径 + 高级函数算式 → 保存后写入 node.calculation，并自动给文字元素绑定结果", async () => {
     const { wrapper, store } = await mountDesigner();
     await openCalculationDialog(wrapper);
 
     expect(wrapper.find(".wbd-modal__title").text()).toContain("配置高级计算");
-    // 左右结构：参与元素在左栏，函数与算式在右栏
+    // 左右结构：左侧可选元素列表（点选即插入），右侧函数与算式
     expect(wrapper.find(".calc__layout").exists()).toBe(true);
-    expect(wrapper.find(".calc__left .calc__element").exists()).toBe(true);
+    expect(wrapper.findAll(".calc__left .calc__pick").length).toBeGreaterThan(0);
     expect(wrapper.find(".calc__right .calc__fn").exists()).toBe(true);
     expect(wrapper.findAll(".calc__fn").length).toBeGreaterThan(10);
 
-    await wrapper.find(".calc__element").setValue("form.f2");
-    await wrapper.find(".calc__formula").setValue("ROUND(A * 1.5, 1)");
+    // 点左侧元素 → 自动插入 form.f2 引用，无需别名映射
+    const f2 = wrapper.findAll(".calc__pick").find((b) => b.text().includes("form.f2"));
+    expect(f2).toBeTruthy();
+    await f2!.trigger("click");
+    await tick();
+    expect((wrapper.find(".calc__formula").element as HTMLTextAreaElement).value).toContain("form.f2");
+
+    await wrapper.find(".calc__formula").setValue("ROUND(form.f2 * 1.5, 1)");
     await wrapper.find(".calc__ok").trigger("click");
     await tick();
 
     const node = store.page.children[0];
     expect(node.calculation).toMatchObject({
-      formula: "ROUND(A * 1.5, 1)",
-      operands: [{ alias: "A", path: "form.f2" }],
+      formula: "ROUND(form.f2 * 1.5, 1)",
     });
-    // 文字元素没有 modelValue，保存时自动把正文绑到回填路径
+    // 新配置不再生成别名参与元素；结果回填到发起计算的元素
+    expect(node.calculation?.operands).toEqual([]);
     expect(node.props?.text).toBe("{{form.f1}}");
     wrapper.unmount();
   });
@@ -157,14 +163,14 @@ describe("Vue 设计器：数据计算弹窗", () => {
   it("点选元素/运算符与函数参数引导把内容写进算式；移除计算按钮删除配置", async () => {
     const { wrapper, store } = await mountDesigner();
     await openCalculationDialog(wrapper);
-    await wrapper.find(".calc__element").setValue("form.f2");
 
-    // Excel 式点选：点元素别名与运算符，算式自动拼接并补空格
-    await wrapper.findAll(".calc__chip").find((button) => button.text() === "A")!.trigger("click");
+    // 点左侧元素 → 插入 form.f2 路径引用
+    const f2 = wrapper.findAll(".calc__pick").find((b) => b.text().includes("form.f2"));
+    await f2!.trigger("click");
     await tick();
     await wrapper.findAll(".calc__token").find((button) => button.text() === "+")!.trigger("click");
     await tick();
-    expect((wrapper.find(".calc__formula").element as HTMLTextAreaElement).value).toContain("A + ");
+    expect((wrapper.find(".calc__formula").element as HTMLTextAreaElement).value).toContain("form.f2 + ");
 
     // 点函数走参数引导，填完槽才插入调用
     const sumButton = wrapper.findAll(".calc__fn").find((button) => button.text() === "SUM");
@@ -172,16 +178,16 @@ describe("Vue 设计器：数据计算弹窗", () => {
     expect(wrapper.find(".calc__guide").exists()).toBe(true);
     const slots = wrapper.findAll(".calc__guide-input");
     expect(slots).toHaveLength(2);
-    await slots[0].setValue("A");
+    await slots[0].setValue("form.f2");
     await slots[1].setValue("1");
     await wrapper.find(".calc__guide-ok").trigger("click");
     await tick();
-    expect((wrapper.find(".calc__formula").element as HTMLTextAreaElement).value).toContain("SUM(A, 1)");
+    expect((wrapper.find(".calc__formula").element as HTMLTextAreaElement).value).toContain("SUM(form.f2, 1)");
     expect(wrapper.find(".calc__guide").exists()).toBe(false);
 
     await wrapper.find(".calc__ok").trigger("click");
     await tick();
-    expect(store.page.children[0].calculation?.formula).toContain("SUM(A, 1)");
+    expect(store.page.children[0].calculation?.formula).toContain("SUM(form.f2, 1)");
 
     await openCalculationDialog(wrapper);
     await wrapper.find(".calc__clear").trigger("click");

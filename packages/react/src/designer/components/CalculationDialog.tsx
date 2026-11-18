@@ -8,7 +8,6 @@
 import { useMemo, useRef, useState } from "react";
 import {
   CALCULATION_AGGREGATES,
-  CALCULATION_ALIASES,
   CONDITION_MODE_OPTIONS,
   CONDITION_OPERATOR_OPTIONS,
   FORMULA_NUMBER_BUTTONS,
@@ -67,12 +66,6 @@ interface Draft {
   whenRows: DraftConditionRow[];
 }
 
-const blankOperand = (index: number): DraftOperand => ({
-  path: "",
-  alias: CALCULATION_ALIASES[index] ?? `V${index + 1}`,
-  aggregate: "sum",
-});
-
 const blankConditionRow = (): DraftConditionRow => ({
   left: "",
   operator: "eq",
@@ -83,7 +76,7 @@ const blankConditionRow = (): DraftConditionRow => ({
 function normalize(config: CalculationConfig | undefined): Draft {
   if (!config) {
     return {
-      operands: [blankOperand(0)],
+      operands: [],
       formula: "",
       precision: "",
       emptyAsZero: false,
@@ -94,13 +87,11 @@ function normalize(config: CalculationConfig | undefined): Draft {
     };
   }
   return {
-    operands: config.operands.length
-      ? config.operands.map((operand) => ({
-          path: operand.path,
-          alias: operand.alias,
-          aggregate: operand.aggregate ?? "sum",
-        }))
-      : [blankOperand(0)],
+    operands: config.operands.map((operand) => ({
+      path: operand.path,
+      alias: operand.alias,
+      aggregate: operand.aggregate ?? "sum",
+    })),
     formula: config.formula,
     precision: config.precision === undefined ? "" : String(config.precision),
     emptyAsZero: Boolean(config.emptyAsZero),
@@ -183,12 +174,6 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
   const patch = (partial: Partial<Draft>): void =>
     setDraft((current) => ({ ...current, ...partial }));
 
-  const updateOperand = (index: number, partial: Partial<DraftOperand>): void =>
-    setDraft((current) => ({
-      ...current,
-      operands: current.operands.map((row, i) => (i === index ? { ...row, ...partial } : row)),
-    }));
-
   const updateConditionRow = (index: number, partial: Partial<DraftConditionRow>): void =>
     setDraft((current) => ({
       ...current,
@@ -204,7 +189,7 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
         label: labelOf(operand.path),
         ...(requiresAggregate(operand.path) ? { aggregate: operand.aggregate } : {}),
       }));
-    if (!operands.length) return null;
+    // 新配置可无别名参与元素：算式直接引用 form.xxx 路径，operands 允许为空
 
     const whenRows: ConditionRow[] = draft.whenEnabled
       ? draft.whenRows
@@ -232,13 +217,17 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
   const preview = (() => {
     if (formulaError) return "算式语法有误，暂不能试算";
     const config = buildConfig();
-    if (!config) return "请先选择至少一个参与元素";
+    if (!config) return "请填写算式";
     const scope: Scope = JSON.parse(JSON.stringify(state.page.state ?? {})) as Scope;
-    for (const operand of config.operands) setByPath(scope, operand.path, 1);
+    if (config.operands.length) {
+      for (const operand of config.operands) setByPath(scope, operand.path, 1);
+    }
     const outcome = evaluateCalculation(config, scope, 0);
     return outcome.skipped
       ? `未参与计算：${outcome.reason ?? "条件未命中"}`
-      : `试算结果：${String(outcome.value)}（每个参与元素按 1 代入）`;
+      : config.operands.length
+        ? `试算结果：${String(outcome.value)}（每个别名元素按 1 代入）`
+        : `试算结果：${String(outcome.value)}（按当前页面数据）`;
   })();
 
   /** 把 token 插到算式光标处；textarea 没有焦点时追加到末尾 */
@@ -260,7 +249,12 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
     else void Promise.resolve().then(placeCursor);
   }
 
-  /** Excel 式点选引用：点元素就把别名写进算式 */
+  /** 点选元素：把绑定路径直接插入算式（无需别名映射） */
+  function insertElement(path: string): void {
+    if (path.trim()) insertToken(path.trim());
+  }
+
+  /** 旧配置兼容：点选元素时仍可插入历史别名 */
   function insertOperand(alias: string): void {
     if (alias.trim()) insertToken(alias.trim());
   }
@@ -285,11 +279,10 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
     setArgSlots((current) => current.map((slot, i) => (i === index ? { ...slot, value } : slot)));
   }
 
-  /** 参数槽里点选元素：把别名填进当前槽 */
+  /** 参数槽里点选元素：直接填绑定路径；旧配置存在别名时优先用别名 */
   function setSlotFromElement(index: number, path: string): void {
-    const alias = draft.operands.find((operand) => operand.path === path)?.alias;
-    if (alias?.trim()) updateArgSlot(index, alias.trim());
-    else notify("请先在上方的参与元素中加入该元素", "error");
+    const legacy = draft.operands.find((operand) => operand.path === path)?.alias;
+    updateArgSlot(index, legacy?.trim() || path);
   }
 
   /** 参数填完 → 拼成调用文本插进算式 */
@@ -356,72 +349,23 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
 
       <div className="calc__layout">
       <div className="calc__left">
-      <div className="calc__section">参与元素</div>
-      <div className="calc__rows calc__rows--left wb-scroll">
-        {draft.operands.map((operand, index) => (
-          <div className="calc__row" key={index}>
-            <span className="calc__no">{index + 1}</span>
-            <UiControl
-              as="Select"
-              className="calc__select calc__element"
-              aria-label="参与元素"
-              placeholder="选择元素"
-              value={operand.path}
-              options={elementOptions}
-              onChange={(value: string) => updateOperand(index, { path: value })}
-            />
-            {requiresAggregate(operand.path) ? (
-              <UiControl
-                as="Select"
-                className="calc__select calc__aggregate"
-                aria-label="聚合口径"
-                value={operand.aggregate}
-                options={aggregateOptions}
-                onChange={(value: string) =>
-                  updateOperand(index, { aggregate: value as ConditionAggregate })
-                }
-              />
-            ) : null}
-            <UiControl
-              as="Input"
-              className="calc__alias"
-              type="text"
-              aria-label="算式变量名"
-              placeholder="变量名 A"
-              value={operand.alias}
-              onChange={(value: string) => updateOperand(index, { alias: value })}
-            />
-            {operand.alias.trim() ? (
-              <UiControl
-                as="Button"
-                className="calc__insert"
-                title={`把 ${operand.alias} 插入算式`}
-                onClick={() => insertOperand(operand.alias)}
-              >
-                插入
-              </UiControl>
-            ) : null}
-            <UiControl
-              as="Button"
-              className="calc__del"
-              aria-label="删除参与元素"
-              onClick={() => patch({ operands: draft.operands.filter((_, i) => i !== index) })}
-            >
-              ×
-            </UiControl>
-          </div>
+      <div className="calc__section">可选元素（点击插入算式）</div>
+      <div className="calc__elements wb-scroll">
+        {elements.map((element) => (
+          <button
+            type="button"
+            key={element.nodeId}
+            className="calc__pick"
+            title={`插入 ${element.path}`}
+            onClick={() => insertElement(element.path)}
+          >
+            <span className="calc__pick-label">{element.label}</span>
+            <span className="calc__pick-path">{element.path}</span>
+          </button>
         ))}
-        {!draft.operands.length ? <div className="calc__empty">还没有参与元素</div> : null}
+        {!elements.length ? <div className="calc__empty">当前页面没有可计算的元素</div> : null}
       </div>
-      <UiControl
-        as="Button"
-        className="calc__add"
-        onClick={() =>
-          patch({ operands: [...draft.operands, blankOperand(draft.operands.length)] })
-        }
-      >
-        ＋ 添加元素
-      </UiControl>
+      <div className="calc__tip">计算结果自动回填到发起计算的元素：{targetPath || "当前元素"}</div>
       </div>{/* /calc__left */}
 
       <div className="calc__right">
@@ -443,7 +387,7 @@ export function CalculationDialog({ target, onClose }: CalculationDialogProps) {
               </UiControl>
             ))}
           {!draft.operands.some((operand) => operand.alias.trim()) ? (
-            <span className="calc__builder-empty">先在上方添加参与元素</span>
+            <span className="calc__builder-empty">从左侧点选元素即可插入引用</span>
           ) : null}
         </div>
         <div className="calc__token-row">

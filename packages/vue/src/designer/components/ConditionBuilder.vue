@@ -416,18 +416,15 @@ function setMode(mode: ConditionMode): void {
 .cond__tip.is-error {
   color: var(--wb-danger);
 }
+/* 条件列表不再套容器框：避免「外框 + 行分隔线 + 控件框」三层叠加 */
 .cond__rows {
   max-height: 260px;
-  border: 1px solid var(--wb-line-soft);
-  border-radius: 8px;
-  background: #fbfcfe;
 }
 .cond__row {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 8px;
-  border-bottom: 1px solid var(--wb-line-soft);
+  padding: 5px 0;
   flex-wrap: wrap;
 }
 .cond__no {

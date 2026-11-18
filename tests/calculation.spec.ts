@@ -219,6 +219,14 @@ describe("特殊设置清单（组件树）", () => {
 });
 
 describe("计算求值", () => {
+  it("无别名参与元素时可直接引用路径，结果回填到发起计算的元素", () => {
+    const scope = { form: { n_price: 10, n_qty: 2, n_total: 0 } };
+    const page = pageWith(config({ operands: [], formula: "form.n_price * form.n_qty" }));
+    const results = applyCalculations(page, scope);
+    expect(results[0]).toMatchObject({ nodeId: "n_total", path: "form.n_total", value: 20, changed: true });
+    expect(scope.form.n_total).toBe(20);
+  });
+
   it("按别名取参与元素，算出结果并写回目标路径", () => {
     const scope = { form: { n_price: 10, n_qty: 2, n_total: 0 } };
     const results = applyCalculations(pageWith(config()), scope);
@@ -331,7 +339,9 @@ describe("协议校验与落库", () => {
     expect(validateCalculationFormula("ROUND(SUM(A, B), 2)")).toBeNull();
     expect(validateCalculationFormula("A + (B")).not.toBeNull();
     expect(validateCalculationConfig(config())).toEqual([]);
-    expect(validateCalculationConfig(config({ operands: [] }))).toContain("至少选择一个参与元素");
+    // 空 operands 合法：算式可直接引用路径，无需别名映射
+    expect(validateCalculationConfig(config({ operands: [], formula: "form.a * form.b" }))).toEqual([]);
+    expect(validateCalculationConfig(config({ operands: [], formula: "form.total * 2" }), "form.total")).toContain("算式不能引用当前元素自身");
     expect(
       validateCalculationConfig(
         config({ operands: [{ alias: "A", path: "form.a" }, { alias: "A", path: "form.b" }] }),
