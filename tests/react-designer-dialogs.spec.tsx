@@ -507,6 +507,109 @@ describe("React 设计器：显示隐藏条件弹窗", () => {
   });
 });
 
+describe("React 设计器：右值按左元素类型渲染（rVDILq）", () => {
+  /** React 受控 select 写值：走原型 setter + change 事件 */
+  async function selectInto(element: HTMLSelectElement, value: string): Promise<void> {
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!;
+    await act(async () => {
+      setter.call(element, value);
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  async function openWith(optionsElements: NodeSchema[], target: NodeSchema = {
+    id: "i1",
+    component: "input",
+    props: { label: "姓名" },
+  }) {
+    const ui = setup(pageWith([target, ...optionsElements]));
+    await ui.render();
+    await ui.select("i1");
+    await click(byText(ui.container, ".inspector__tab", "样式"));
+    // 已有 visibility 时按钮摘要不是「未配置」，直接按选择器点
+    await click(ui.container.querySelector(".style__cond-btn:not(.style__calc-btn)"));
+    return ui;
+  }
+
+  it("选选项类元素后右侧变成下拉，可点选节点自身配置的选项并落库 value", async () => {
+    const ui = await openWith([
+      { id: "dept", component: "select", props: { label: "部门", options: "技术中心 tech\n产品中心 product" } },
+    ]);
+    try {
+      await selectInto(ui.container.querySelector(".cond__left") as HTMLSelectElement, "form.dept");
+      const valueSelect = ui.container.querySelector(".cond__value-select") as HTMLSelectElement;
+      expect(valueSelect).toBeTruthy();
+      const labels = [...valueSelect.querySelectorAll("option")].map((option) => option.textContent);
+      expect(labels).toContain("技术中心");
+      expect(labels).toContain("产品中心");
+
+      await selectInto(valueSelect, "product");
+      await click(ui.container.querySelector(".cond__ok"));
+      expect(ui.nodeOf("i1")?.visibility?.when.rows[0]).toMatchObject({
+        left: "form.dept",
+        operator: "eq",
+        value: "product",
+      });
+    } finally {
+      await ui.cleanup();
+    }
+  });
+
+  it("切换左元素清空旧值；数字/开关元素右侧不是文本框", async () => {
+    const ui = await openWith([
+      { id: "dept", component: "select", props: { options: "技术中心 tech\n产品中心 product" } },
+      { id: "age", component: "number", props: { label: "年龄" } },
+      { id: "flag", component: "switch", props: { label: "启用" } },
+    ]);
+    try {
+      await selectInto(ui.container.querySelector(".cond__left") as HTMLSelectElement, "form.dept");
+      await selectInto(ui.container.querySelector(".cond__value-select") as HTMLSelectElement, "product");
+
+      await selectInto(ui.container.querySelector(".cond__left") as HTMLSelectElement, "form.age");
+      const numberInput = ui.container.querySelector(".cond__value") as HTMLInputElement;
+      expect(numberInput.tagName).toBe("INPUT");
+      expect(numberInput.type).toBe("number");
+      expect(numberInput.value).toBe("");
+
+      await selectInto(ui.container.querySelector(".cond__left") as HTMLSelectElement, "form.flag");
+      const flagSelect = ui.container.querySelector(".cond__value-select") as HTMLSelectElement;
+      expect(flagSelect).toBeTruthy();
+      const labels = [...flagSelect.querySelectorAll("option")].map((option) => option.textContent);
+      expect(labels).toContain("真");
+      expect(labels).toContain("假");
+    } finally {
+      await ui.cleanup();
+    }
+  });
+
+  it("旧配置里的 {{表达式}} 值补「保留旧值」候选，原样保存不丢", async () => {
+    const ui = await openWith(
+      [{ id: "dept", component: "select", props: { options: "技术中心 tech" } }],
+      {
+        id: "i1",
+        component: "input",
+        props: { label: "姓名" },
+        visibility: {
+          when: { mode: "and", rows: [{ left: "form.dept", operator: "eq", value: "{{form.old}}" }] },
+          action: "show",
+        },
+      },
+    );
+    try {
+      const valueSelect = ui.container.querySelector(".cond__value-select") as HTMLSelectElement;
+      expect(valueSelect).toBeTruthy();
+      expect(valueSelect.value).toBe("{{form.old}}");
+      const labels = [...valueSelect.querySelectorAll("option")].map((option) => option.textContent ?? "");
+      expect(labels.some((text) => text.includes("保留旧值"))).toBe(true);
+
+      await click(ui.container.querySelector(".cond__ok"));
+      expect(ui.nodeOf("i1")?.visibility?.when.rows[0].value).toBe("{{form.old}}");
+    } finally {
+      await ui.cleanup();
+    }
+  });
+});
+
 describe("React 设计器：问号提示浮层", () => {
   it("弹层挂到 body，不会被弹窗的 overflow 裁剪", async () => {
     const container = document.createElement("div");

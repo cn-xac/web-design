@@ -151,6 +151,128 @@ describe("设计器：显示 / 隐藏条件弹窗", () => {
   });
 });
 
+describe("设计器：右值按左元素类型渲染（rVDILq）", () => {
+  async function mountWithSelect() {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const wrapper = mount(DesignerView, {
+      props: { pageId },
+      global: { plugins: [pinia] },
+    });
+    await tick(60);
+
+    const store = useDesignerStore(pinia);
+    store.setPage({
+      ...blankTemplate("显隐测试"),
+      children: [
+        { id: "f1", component: "input", props: { label: "姓名" } },
+        {
+          id: "dept",
+          component: "select",
+          props: { label: "部门", options: "技术中心 tech\n产品中心 product" },
+        },
+        { id: "age", component: "number", props: { label: "年龄" } },
+        { id: "flag", component: "switch", props: { label: "启用" } },
+      ],
+    });
+    store.select("f1");
+    await tick(40);
+    await openConditionDialog(wrapper);
+    return { wrapper, store };
+  }
+
+  it("选选项类元素后右侧变成下拉，可点选节点自身配置的选项并落库 value", async () => {
+    const { wrapper, store } = await mountWithSelect();
+
+    await wrapper.find(".cond__left").setValue("form.dept");
+    await tick();
+
+    const valueSelect = wrapper.find(".cond__value-select");
+    expect(valueSelect.exists()).toBe(true);
+    const labels = valueSelect.findAll("option").map((option) => option.text());
+    expect(labels).toContain("技术中心");
+    expect(labels).toContain("产品中心");
+
+    await valueSelect.setValue("tech");
+    await wrapper.find(".cond__ok").trigger("click");
+    await tick();
+
+    expect(store.page.children[0].visibility?.when.rows[0]).toMatchObject({
+      left: "form.dept",
+      operator: "eq",
+      value: "tech",
+    });
+  });
+
+  it("切换左元素会清空旧值；数字/开关元素右侧不是文本框", async () => {
+    const { wrapper } = await mountWithSelect();
+
+    await wrapper.find(".cond__left").setValue("form.dept");
+    await tick();
+    await wrapper.find(".cond__value-select").setValue("product");
+    expect((wrapper.find(".cond__value-select").element as HTMLSelectElement).value).toBe("product");
+
+    // 切到数字元素：旧选项值被清空，右侧变 number 输入
+    await wrapper.find(".cond__left").setValue("form.age");
+    await tick();
+    const numberInput = wrapper.find(".cond__value");
+    expect(numberInput.attributes("type")).toBe("number");
+    expect((numberInput.element as HTMLInputElement).value).toBe("");
+
+    // 切到开关：右侧变真/假下拉
+    await wrapper.find(".cond__left").setValue("form.flag");
+    await tick();
+    expect(wrapper.find(".cond__value-select").exists()).toBe(true);
+    const flagLabels = wrapper.find(".cond__value-select").findAll("option").map((o) => o.text());
+    expect(flagLabels).toContain("真");
+    expect(flagLabels).toContain("假");
+  });
+
+  it("旧配置里的 {{表达式}} 值不丢失，选项类补「保留旧值」候选并选中", async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const wrapper = mount(DesignerView, {
+      props: { pageId },
+      global: { plugins: [pinia] },
+    });
+    await tick(60);
+    const store = useDesignerStore(pinia);
+    store.setPage({
+      ...blankTemplate("显隐测试"),
+      children: [
+        {
+          id: "f1",
+          component: "input",
+          props: { label: "姓名" },
+          visibility: {
+            when: { mode: "and", rows: [{ left: "form.dept", operator: "eq", value: "{{form.old}}" }] },
+            action: "show",
+          },
+        },
+        {
+          id: "dept",
+          component: "select",
+          props: { label: "部门", options: "技术中心 tech" },
+        },
+      ],
+    });
+    store.select("f1");
+    await tick(40);
+    await openConditionDialog(wrapper);
+
+    const valueSelect = wrapper.find(".cond__value-select");
+    expect(valueSelect.exists()).toBe(true);
+    expect((valueSelect.element as HTMLSelectElement).value).toBe("{{form.old}}");
+    const labels = valueSelect.findAll("option").map((option) => option.text());
+    expect(labels.some((text) => text.includes("保留旧值"))).toBe(true);
+
+    // 原样确定保存也不丢
+    await wrapper.find(".cond__ok").trigger("click");
+    await tick();
+    expect(store.page.children[0].visibility?.when.rows[0].value).toBe("{{form.old}}");
+  });
+});
+
 describe("条件源清单：子表单单向作用域", () => {
   const page: PageSchema = {
     schemaVersion: "1.1.0",
